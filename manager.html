@@ -1278,28 +1278,57 @@ function setTeaOpt(userId, session, teaType){
   }
 }
 
-async function saveTeaAttendance(){
+async function saveTeaAttendance() {
   const date = document.getElementById('teaDate').value || todayStr();
-  const records = [];
-  allUsers.forEach(u => {
-    const st = teaState[u.id] || {morning:'none', evening:'none'};
-    ['morning','evening'].forEach(session => {
-      const tt = st[session] || 'none';
-      records.push({userId:u.id, username:u.username, name:u.name, session, teaType:tt});
-    });
-  });
-  showMsg('teaMsg','Saving…','');
-  try{
-    const res = await api({action:'setTeaAttendance', date, records: JSON.stringify(records)});
-    if(res.success){
-      showMsg('teaMsg','Tea attendance saved for '+date,'success');
-      toast('Tea records saved ✓','success');
-      loadTeaAttendance(); // reload to refresh summary
-    } else showMsg('teaMsg',res.message,'error');
-  }catch(e){showMsg('teaMsg','Network error','error');}
-}
+  
+  if (!allUsers.length) { toast('No users to save', 'error'); return; }
 
-// ── RATINGS ──────────────────────────────────────────────────
+  const btn = document.querySelector('#pane-teaatt .btn-primary');
+  btn.disabled = true;
+
+  let saved = 0, failed = 0;
+  const total = allUsers.length;
+
+  showMsg('teaMsg', '⏳ Saving 0 / ' + total + '...', '');
+  document.getElementById('teaMsg').style.display = 'block';
+
+  for (const u of allUsers) {
+    const st = teaState[u.id] || { morning: 'none', evening: 'none' };
+
+    // Save morning and evening as one record per session
+    for (const session of ['morning', 'evening']) {
+      const teaType = st[session] || 'none';
+      try {
+        await api({
+          action: 'setTeaRecord',
+          date,
+          userId:   u.id,
+          username: u.username,
+          name:     u.name,
+          session,
+          teaType
+        });
+      } catch (e) {
+        failed++;
+      }
+    }
+
+    saved++;
+    showMsg('teaMsg', '⏳ Saving ' + saved + ' / ' + total + '...', '');
+  }
+
+  btn.disabled = false;
+
+  if (failed === 0) {
+    showMsg('teaMsg', '✅ Tea attendance saved for ' + date, 'success');
+    toast('Tea records saved ✓', 'success');
+    loadTeaAttendance();
+  } else {
+    showMsg('teaMsg', '⚠️ ' + failed + ' session(s) failed. Press Save again to retry.', 'error');
+    toast('Some records failed — press Save again', 'error');
+  }
+}
+  // ── RATINGS ──────────────────────────────────────────────────
 async function loadRatings(silent=false){
   const date=document.getElementById('ratDate').value||todayStr();
   const body=document.getElementById('ratingsBody');
