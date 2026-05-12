@@ -1280,7 +1280,6 @@ function setTeaOpt(userId, session, teaType){
 
 async function saveTeaAttendance() {
   const date = document.getElementById('teaDate').value || todayStr();
-  
   if (!allUsers.length) { toast('No users to save', 'error'); return; }
 
   const btn = document.querySelector('#pane-teaatt .btn-primary');
@@ -1294,25 +1293,22 @@ async function saveTeaAttendance() {
 
   for (const u of allUsers) {
     const st = teaState[u.id] || { morning: 'none', evening: 'none' };
-
-    // Save morning and evening as one record per session
     for (const session of ['morning', 'evening']) {
       const teaType = st[session] || 'none';
       try {
         await api({
-          action: 'setTeaRecord',
+          action:   'setTeaRecord',
           date,
           userId:   u.id,
-          username: u.username,
-          name:     u.name,
+          username: u.username,       // username is always safe (a-z0-9._)
           session,
           teaType
+          // name intentionally omitted — backend looks it up from Users sheet
         });
       } catch (e) {
         failed++;
       }
     }
-
     saved++;
     showMsg('teaMsg', '⏳ Saving ' + saved + ' / ' + total + '...', '');
   }
@@ -1327,7 +1323,7 @@ async function saveTeaAttendance() {
     showMsg('teaMsg', '⚠️ ' + failed + ' session(s) failed. Press Save again to retry.', 'error');
     toast('Some records failed — press Save again', 'error');
   }
-}
+}}
   // ── RATINGS ──────────────────────────────────────────────────
 async function loadRatings(silent=false){
   const date=document.getElementById('ratDate').value||todayStr();
