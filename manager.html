@@ -1291,27 +1291,21 @@ async function saveTeaAttendance() {
   showMsg('teaMsg', '⏳ Saving 0 / ' + total + '...', '');
   document.getElementById('teaMsg').style.display = 'block';
 
-  for (const u of allUsers) {
+  // Fire ALL users in parallel — one call per user (both sessions combined)
+  const promises = allUsers.map(u => {
     const st = teaState[u.id] || { morning: 'none', evening: 'none' };
-    for (const session of ['morning', 'evening']) {
-      const teaType = st[session] || 'none';
-      try {
-        await api({
-          action:   'setTeaRecord',
-          date,
-          userId:   u.id,
-          username: u.username,       // username is always safe (a-z0-9._)
-          session,
-          teaType
-          // name intentionally omitted — backend looks it up from Users sheet
-        });
-      } catch (e) {
-        failed++;
-      }
-    }
-    saved++;
-    showMsg('teaMsg', '⏳ Saving ' + saved + ' / ' + total + '...', '');
-  }
+    return api({
+      action:   'setTeaBothSessions',
+      date,
+      userId:   u.id,
+      username: u.username,
+      morning:  st.morning || 'none',
+      evening:  st.evening || 'none'
+    }).then(() => { saved++; showMsg('teaMsg', '⏳ Saving ' + saved + ' / ' + total + '...', ''); })
+      .catch(() => { failed++; });
+  });
+
+  await Promise.all(promises);
 
   btn.disabled = false;
 
@@ -1320,10 +1314,10 @@ async function saveTeaAttendance() {
     toast('Tea records saved ✓', 'success');
     loadTeaAttendance();
   } else {
-    showMsg('teaMsg', '⚠️ ' + failed + ' session(s) failed. Press Save again to retry.', 'error');
+    showMsg('teaMsg', '⚠️ ' + failed + ' user(s) failed. Press Save again to retry.', 'error');
     toast('Some records failed — press Save again', 'error');
   }
-}}
+}}}
   // ── RATINGS ──────────────────────────────────────────────────
 async function loadRatings(silent=false){
   const date=document.getElementById('ratDate').value||todayStr();
