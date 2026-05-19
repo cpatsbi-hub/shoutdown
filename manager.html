@@ -1291,8 +1291,25 @@ async function saveTeaAttendance() {
   showMsg('teaMsg', '⏳ Saving 0 / ' + total + '...', '');
   document.getElementById('teaMsg').style.display = 'block';
 
-  // Fire ALL users in parallel — one call per user (both sessions combined)
-  const promises = allUsers.map(u => {
+// Only save users who had tea or black tea in at least one session
+  const activeUsers = allUsers.filter(u => {
+    const st = teaState[u.id] || { morning: 'none', evening: 'none' };
+    return st.morning !== 'none' || st.evening !== 'none';
+  });
+
+  const total = activeUsers.length;
+
+  if (total === 0) {
+    btn.disabled = false;
+    showMsg('teaMsg', 'ℹ️ No tea records to save (everyone is None).', '');
+    return;
+  }
+
+  showMsg('teaMsg', '⏳ Saving 0 / ' + total + '...', '');
+  document.getElementById('teaMsg').style.display = 'block';
+
+  // Fire only active users in parallel
+  const promises = activeUsers.map(u => {
     const st = teaState[u.id] || { morning: 'none', evening: 'none' };
     return api({
       action:   'setTeaBothSessions',
