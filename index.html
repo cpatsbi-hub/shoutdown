@@ -1,1189 +1,914 @@
-<!DOCTYPE html>
-<html lang="ml">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Office Canteen</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-<style>
-:root{
-  --amber:#c2692a;--green:#2d6a4f;--gold:#e8a020;--cream:#fdf8f2;--white:#fff;
-  --text:#1a1a1a;--muted:#6b7280;--border:#e5e0d8;--shadow:0 4px 24px rgba(0,0,0,.10);
-  --shadow2:0 8px 40px rgba(0,0,0,.18);--radius:20px;--present:#059669;--absent:#dc2626;
-  --star:#f59e0b;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;font-family:'DM Sans',sans-serif;color:var(--text);-webkit-text-size-adjust:100%}
-.ml{font-family:'Noto Sans Malayalam','DM Sans',sans-serif}
-#bg{position:fixed;inset:0;z-index:0;background:url('https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=1920&q=80') center/cover no-repeat}
-#bg::after{content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(12,40,25,.78) 0%,rgba(80,35,5,.65) 100%)}
-#root{position:relative;z-index:10;min-height:100vh;display:flex;flex-direction:column}
+// ============================================================
+//  CANTEEN MANAGEMENT SYSTEM v6 — Google Apps Script Backend
+//  Veg/Non-veg billing · Weekly Menu · Bill Archive
+//  Tea Attendance (Morning/Evening) · Admin Actions
+//  Sheet ID set in Script Properties → SHEET_ID
+// ============================================================
 
-/* ── BILL BANNER ── */
-#billBanner{display:none;background:linear-gradient(90deg,#1e1b4b,#312e81,#1e1b4b);overflow:hidden;border-bottom:1.5px solid rgba(167,139,250,.35);cursor:pointer;flex-shrink:0}
-.bill-marquee-track{display:flex;animation:marquee 18s linear infinite;white-space:nowrap}
-.bill-marquee-item{display:inline-flex;align-items:center;gap:10px;padding:8px 24px;color:#c4b5fd;font-size:12px;font-weight:600}
-.bill-marquee-item i{color:#a78bfa;font-size:13px}
-.bill-new-pill{background:#4f46e5;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;animation:blink 1.6s ease-in-out infinite;flex-shrink:0}
-@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.45}}
-
-/* ── BILL MODAL ── */
-#billModalOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:flex-end;justify-content:center}
-#billModalOverlay.open{display:flex}
-.bill-sheet{background:var(--white);border-radius:22px 22px 0 0;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.bill-sheet-drag{width:40px;height:4px;background:#d1d5db;border-radius:2px;margin:10px auto 0}
-.bill-sheet-header{padding:14px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--white);z-index:1}
-.bill-sheet-title{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px}
-.bill-new-badge{background:#4f46e5;color:#fff;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700}
-.bill-sheet-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;line-height:1;border-radius:6px}
-.bill-sheet-close:hover{background:var(--cream)}
-.bill-sheet-body{padding:14px 16px 28px}
-.bill-period-badge{display:inline-flex;align-items:center;gap:5px;background:#ede9fe;color:#5b21b6;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;margin-bottom:12px}
-.bill-total-box{background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:16px;padding:18px;text-align:center;margin-bottom:14px;color:#fff}
-.bill-total-label{font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.09em;margin-bottom:5px}
-.bill-total-amount{font-family:'Playfair Display',serif;font-size:36px;font-weight:700;letter-spacing:-.01em}
-.bill-breakdown table{width:100%;border-collapse:collapse}
-.bill-breakdown td{padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
-.bill-breakdown td:first-child{color:var(--muted);display:flex;align-items:center;gap:7px}
-.bill-breakdown td:last-child{text-align:right;font-weight:600;color:var(--text)}
-.bill-breakdown tr:last-child td{border-bottom:none}
-.bill-total-row td{border-top:2px solid var(--border)!important;border-bottom:none!important;padding-top:13px!important;font-size:15px!important;font-weight:700!important}
-.bill-total-row td:last-child{color:#4f46e5!important;font-size:18px!important}
-.bill-diet-row{display:flex;align-items:center;gap:6px;background:var(--cream);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--muted)}
-.bill-diet-row strong{color:var(--text)}
-
-/* ── AUTH ── */
-#authScreen{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1rem}
-.auth-brand{text-align:center;margin-bottom:1.5rem;color:#fff}
-.auth-brand-icon{width:64px;height:64px;background:linear-gradient(135deg,var(--gold),var(--amber));border-radius:18px;display:flex;align-items:center;justify-content:center;margin:0 auto .85rem;font-size:1.8rem;color:#fff;box-shadow:0 8px 24px rgba(194,105,42,.4)}
-.auth-brand h1{font-family:'Playfair Display',serif;font-size:1.75rem;letter-spacing:-.01em}
-.auth-brand p{opacity:.7;font-size:.84rem;margin-top:.18rem}
-.auth-card{background:rgba(255,255,255,.97);border-radius:var(--radius);width:100%;max-width:400px;overflow:hidden;box-shadow:var(--shadow2)}
-.auth-tabs{display:flex;border-bottom:2px solid var(--border)}
-.auth-tab{flex:1;padding:.68rem .4rem;text-align:center;font-size:.74rem;font-weight:700;cursor:pointer;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;transition:all .2s;border-bottom:3px solid transparent;margin-bottom:-2px;user-select:none}
-.auth-tab:hover{color:var(--green)}
-.auth-tab.active{color:var(--green);border-bottom-color:var(--green)}
-.auth-panel{padding:1.25rem;display:none}
-.auth-panel.active{display:block;animation:fadeUp .25s ease}
-.user-pill{display:flex;align-items:center;gap:.7rem;background:var(--cream);border-radius:12px;padding:.75rem .9rem;border:2px solid var(--border);margin-bottom:.9rem}
-.user-pill-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--green),#1a4a32);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;font-weight:700;flex-shrink:0}
-.user-pill-name{font-weight:700;font-size:.9rem}
-.user-pill-sub{font-size:.7rem;color:var(--muted)}
-.pill-clear{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.88rem;padding:.22rem;border-radius:6px;flex-shrink:0;transition:all .2s;line-height:1}
-.pill-clear:hover{background:#fee2e2;color:var(--absent)}
-.auth-switch{text-align:center;font-size:.78rem;color:var(--muted)}
-.auth-switch a{color:var(--green);font-weight:600;cursor:pointer;text-decoration:none}
-.auth-switch a:hover{text-decoration:underline}
-.find-intro{text-align:center;margin-bottom:1rem;padding:.75rem;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:12px;border:1px solid #bfdbfe}
-.find-intro p{font-size:.8rem;color:#1e40af;line-height:1.55}
-.find-icon{font-size:1.2rem;color:#3b82f6;display:block;margin-bottom:.3rem}
-.btn-ghost{background:transparent;color:var(--green);border:2px solid var(--green)}
-.btn-ghost:hover{background:var(--green);color:#fff}
-.find-result-item{display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:var(--cream);border:2px solid var(--border);border-radius:12px;padding:.75rem .95rem;margin-top:.5rem;animation:fadeUp .2s ease}
-.find-result-name{font-weight:700;font-size:.88rem}
-.find-result-un{font-size:.74rem;color:var(--muted);margin-top:.08rem;font-family:monospace,monospace}
-.find-use-btn{background:var(--green);color:#fff;border:none;border-radius:9px;padding:.42rem .85rem;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s;font-family:'DM Sans',sans-serif;flex-shrink:0}
-.find-use-btn:hover{background:#1a4a32}
-
-/* FORM */
-.field{margin-bottom:.9rem}
-.field label{display:block;font-size:.74rem;font-weight:700;color:var(--muted);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em}
-.field input{width:100%;padding:.72rem .95rem;border:2px solid var(--border);border-radius:11px;font-family:'Noto Sans Malayalam','DM Sans',sans-serif;font-size:.92rem;background:var(--cream);transition:all .2s;color:var(--text)}
-.field input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(45,106,79,.12);background:var(--white)}
-.field .hint{font-size:.7rem;color:var(--muted);margin-top:.28rem}
-.btn{display:inline-flex;align-items:center;gap:.5rem;justify-content:center;padding:.78rem 1.5rem;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:.92rem;font-weight:700;cursor:pointer;border:none;transition:all .2s;width:100%}
-.btn-green{background:linear-gradient(135deg,var(--green),#1a4a32);color:#fff}
-.btn-green:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(45,106,79,.4)}
-.btn-amber{background:linear-gradient(135deg,var(--amber),#9a4418);color:#fff}
-.btn-amber:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(194,105,42,.4)}
-.btn:disabled{opacity:.55;cursor:not-allowed;transform:none!important}
-.msg{padding:.62rem .95rem;border-radius:10px;font-size:.8rem;margin-top:.65rem;display:none}
-.msg.error{background:#fee2e2;color:#991b1b;border-left:3px solid var(--absent)}
-.msg.success{background:#d1fae5;color:#065f46;border-left:3px solid var(--present)}
-.msg.show{display:block}
-
-/* ── APP ── */
-#appScreen{display:none;flex:1;flex-direction:column;min-height:100vh}
-.app-header{background:rgba(18,50,30,.92);backdrop-filter:blur(12px);padding:.85rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)}
-.user-greeting{color:#fff;min-width:0}
-.user-greeting .label{font-size:.65rem;opacity:.55;text-transform:uppercase;letter-spacing:.06em}
-.user-greeting .name{font-family:'Playfair Display',serif;font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
-.user-greeting .usub{font-size:.68rem;color:rgba(255,255,255,.45);margin-top:.05rem}
-.header-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
-.btn-hdr{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.18);padding:.36rem .75rem;border-radius:8px;cursor:pointer;font-size:.73rem;font-family:'DM Sans',sans-serif;transition:all .2s;display:flex;align-items:center;gap:.3rem;white-space:nowrap}
-.btn-hdr:hover{background:rgba(255,255,255,.22)}
-.btn-hdr-red{background:rgba(220,38,38,.18);color:#fca5a5;border-color:rgba(220,38,38,.28)}
-.btn-hdr-red:hover{background:rgba(220,38,38,.4);color:#fff}
-
-.app-body{flex:1;padding:0 0 4rem;width:100%;max-width:600px;margin:0 auto}
-.date-strip{text-align:center;color:rgba(255,255,255,.78);font-size:.78rem;padding:.85rem 1rem .65rem;display:flex;align-items:center;justify-content:center;gap:.45rem}
-.date-strip .dot{width:5px;height:5px;background:var(--gold);border-radius:50%;flex-shrink:0}
-
-/* MENU CARD */
-.menu-card{background:var(--white);border-radius:0;overflow:hidden;box-shadow:none;margin-bottom:.7rem;animation:fadeUp .4s ease;border-bottom:1px solid var(--border)}
-@media(min-width:480px){.menu-card{border-radius:16px;margin:0 .75rem .7rem;box-shadow:var(--shadow2);border-bottom:none}}
-.menu-hero{width:100%;height:160px;object-fit:cover;display:block}
-.menu-hero-placeholder{width:100%;height:120px;background:linear-gradient(135deg,#e8f4ea,#d0e8d8);display:flex;align-items:center;justify-content:center;font-size:3.5rem}
-.menu-card-body{padding:1rem 1.1rem}
-.menu-label{font-size:.68rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.3rem;display:flex;align-items:center;gap:.3rem}
-.menu-name{font-family:'Noto Sans Malayalam','Playfair Display',serif;font-size:1.45rem;color:var(--green);line-height:1.3;margin-bottom:.1rem}
-.veg-badge{display:inline-flex;align-items:center;gap:.22rem;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:4px;padding:.06rem .38rem;font-size:.62rem;font-weight:700;margin-left:.38rem;vertical-align:middle}
-.nonveg-badge{display:inline-flex;align-items:center;gap:.22rem;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:.06rem .38rem;font-size:.62rem;font-weight:700;margin-left:.38rem;vertical-align:middle}
-.pure-veg-strip{display:flex;align-items:center;gap:.4rem;background:#d1fae5;border-radius:8px;padding:.45rem .75rem;margin:.6rem 0;font-size:.75rem;font-weight:700;color:#065f46;border:1px solid #a7f3d0}
-.menu-divider{height:1px;background:var(--border);margin:.9rem 0}
-.sides-section{margin-top:.65rem}
-.sides-label{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem;display:flex;align-items:center;gap:.3rem}
-.side-dish-item{display:flex;align-items:center;gap:.65rem;background:var(--cream);border-radius:11px;padding:.55rem .75rem;margin-bottom:.42rem;border:1px solid var(--border)}
-.side-dish-img{width:38px;height:38px;border-radius:7px;object-fit:cover;flex-shrink:0;border:2px solid var(--white)}
-.side-dish-img-placeholder{width:38px;height:38px;border-radius:7px;background:linear-gradient(135deg,#d0e8d8,#b8d8c0);display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0}
-.side-dish-name{font-size:.86rem;font-weight:600;color:var(--text);font-family:'Noto Sans Malayalam','DM Sans',sans-serif}
-
-/* ATTENDANCE */
-.att-question{font-size:.86rem;font-weight:600;color:var(--text);margin-bottom:.8rem;display:flex;align-items:center;gap:.4rem}
-.att-question i{color:var(--amber)}
-.att-buttons{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-.att-btn{padding:.85rem .5rem;border-radius:13px;cursor:pointer;border:2px solid var(--border);font-family:'DM Sans',sans-serif;font-weight:700;font-size:.88rem;display:flex;flex-direction:column;align-items:center;gap:.3rem;transition:all .22s;background:var(--cream);-webkit-tap-highlight-color:transparent;user-select:none}
-.att-btn .att-icon{font-size:1.5rem}
-.att-btn .att-label{font-size:.74rem;font-weight:600}
-.att-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:var(--shadow)}
-.att-btn-present:hover:not(:disabled){background:#d1fae5;border-color:var(--present);color:var(--present)}
-.att-btn-absent:hover:not(:disabled){background:#fee2e2;border-color:var(--absent);color:var(--absent)}
-.att-btn:disabled{opacity:.5;cursor:not-allowed}
-.att-marked{border-radius:14px;padding:1.1rem;text-align:center;animation:fadeUp .3s ease}
-.att-marked.present{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border:2px solid #6ee7b7}
-.att-marked.absent{background:linear-gradient(135deg,#fee2e2,#fecaca);border:2px solid #fca5a5}
-.att-marked .marked-icon{font-size:1.9rem;margin-bottom:.35rem;display:block}
-.att-marked .marked-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700}
-.att-marked .marked-sub{font-size:.76rem;margin-top:.18rem;opacity:.72}
-.change-btn{margin-top:.8rem;background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:11px;padding:.6rem 1.15rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.38rem;box-shadow:0 4px 12px rgba(5,150,105,.32);transition:all .2s}
-.change-btn:hover{transform:translateY(-1px)}
-.locked-note{margin-top:.5rem;font-size:.68rem;opacity:.5;display:flex;align-items:center;gap:.3rem;justify-content:center}
-
-/* RATING */
-.rating-card{background:var(--white);border-radius:0;overflow:hidden;box-shadow:none;margin-bottom:.7rem;border-bottom:1px solid var(--border)}
-@media(min-width:480px){.rating-card{border-radius:16px;margin:0 .75rem .7rem;box-shadow:var(--shadow);border-bottom:none}}
-.rating-card-header{background:linear-gradient(135deg,var(--green),#1a4a32);color:#fff;padding:.85rem 1.1rem;display:flex;align-items:center;gap:.55rem}
-.rating-card-header i{font-size:.9rem;color:var(--gold)}
-.rating-card-header h3{font-family:'Playfair Display',serif;font-size:.95rem}
-.rating-item{padding:.9rem 1.1rem;border-bottom:1px solid var(--border)}
-.rating-item:last-child{border-bottom:none}
-.rating-item-name{font-weight:700;font-size:.88rem;color:var(--text);margin-bottom:.45rem;display:flex;align-items:center;gap:.45rem;font-family:'Noto Sans Malayalam','DM Sans',sans-serif;flex-wrap:wrap}
-.rating-item-type-badge{font-size:.64rem;background:rgba(45,106,79,.1);color:var(--green);border-radius:20px;padding:.08rem .42rem;font-weight:600;font-family:'DM Sans',sans-serif}
-.star-row{display:flex;align-items:center;gap:.22rem;margin-bottom:.45rem;flex-wrap:nowrap}
-.star{font-size:1.5rem;cursor:pointer;color:#d1d5db;transition:color .15s,transform .1s;user-select:none;line-height:1;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-.star.active{color:var(--star)}
-.star:hover{transform:scale(1.12)}
-.rating-comment{width:100%;padding:.52rem .8rem;border:2px solid var(--border);border-radius:9px;font-family:'Noto Sans Malayalam','DM Sans',sans-serif;font-size:.84rem;resize:vertical;min-height:54px;background:var(--cream);transition:border .2s}
-.rating-comment:focus{outline:none;border-color:var(--green);background:var(--white)}
-.comment-hint{font-size:.67rem;color:var(--muted);margin-top:.18rem}
-.rated-badge{display:inline-flex;align-items:center;gap:.32rem;background:#d1fae5;color:#065f46;border-radius:20px;padding:.22rem .72rem;font-size:.75rem;font-weight:700;margin-bottom:.38rem}
-.rating-submit-row{padding:.8rem 1.1rem;background:var(--cream);display:flex;justify-content:flex-end}
-.btn-submit-rating{background:linear-gradient(135deg,var(--amber),#9a4418);color:#fff;border:none;padding:.58rem 1.3rem;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:.83rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:.38rem}
-.btn-submit-rating:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(194,105,42,.4)}
-.btn-submit-rating:disabled{opacity:.5;cursor:not-allowed;transform:none}
-
-/* HISTORY */
-.history-panel{background:rgba(255,255,255,.97);border-radius:0;overflow:hidden;box-shadow:none;margin-top:.7rem;animation:fadeUp .3s ease;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-@media(min-width:480px){.history-panel{border-radius:14px;margin:.7rem .75rem 0;box-shadow:var(--shadow);border:none}}
-.history-header{background:var(--cream);padding:.8rem 1rem;border-bottom:1px solid var(--border);font-weight:700;font-size:.85rem;color:var(--text);display:flex;align-items:center;gap:.38rem}
-.history-item{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border)}
-.history-item:last-child{border-bottom:none}
-.hi-date{font-weight:700;font-size:.83rem}
-.hi-day{font-size:.7rem;color:var(--muted)}
-.badge{display:inline-flex;align-items:center;gap:.22rem;padding:.18rem .55rem;border-radius:20px;font-size:.7rem;font-weight:700}
-.badge-present{background:#d1fae5;color:#065f46}
-.badge-absent{background:#fee2e2;color:#991b1b}
-
-/* LOADING / NO MENU */
-.no-menu-card{background:rgba(255,255,255,.95);border-radius:0;padding:2.2rem;text-align:center;box-shadow:none;border-top:1px solid rgba(255,255,255,.2)}
-@media(min-width:480px){.no-menu-card{border-radius:18px;margin:0 .75rem;box-shadow:var(--shadow2);border:none}}
-.nm-icon{font-size:3.2rem;display:block;margin-bottom:.85rem}
-.no-menu-card h2{font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--green);margin-bottom:.45rem}
-.no-menu-card p{color:var(--muted);font-size:.85rem}
-.loading-card{background:rgba(255,255,255,.88);border-radius:0;padding:2.2rem;text-align:center;box-shadow:none}
-@media(min-width:480px){.loading-card{border-radius:18px;margin:0 .75rem;box-shadow:var(--shadow2)}}
-.spinner{width:26px;height:26px;border:3px solid rgba(45,106,79,.18);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-
-/* SUGGESTIONS */
-.sug-card{background:var(--white);border-radius:0;overflow:hidden;box-shadow:none;margin-bottom:.7rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-@media(min-width:480px){.sug-card{border-radius:16px;margin:0 .75rem .7rem;box-shadow:var(--shadow);border:none}}
-.sug-card-header{background:linear-gradient(135deg,#4f46e5,#3730a3);color:#fff;padding:.85rem 1.1rem;display:flex;align-items:center;justify-content:space-between}
-.sug-card-header h3{font-family:'Playfair Display',serif;font-size:.95rem;display:flex;align-items:center;gap:.48rem}
-.sug-add-row{display:flex;gap:.45rem;padding:.9rem 1.1rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
-.sug-add-row input{flex:1;min-width:100px;padding:.56rem .8rem;border:2px solid var(--border);border-radius:9px;font-family:'Noto Sans Malayalam','DM Sans',sans-serif;font-size:.86rem;background:var(--cream);color:var(--text);transition:border .2s}
-.sug-add-row input:focus{outline:none;border-color:#4f46e5;background:var(--white)}
-.sug-add-row select{padding:.56rem .65rem;border:2px solid var(--border);border-radius:9px;font-family:'DM Sans',sans-serif;font-size:.83rem;background:var(--cream);color:var(--text);cursor:pointer}
-.sug-add-btn{background:linear-gradient(135deg,#4f46e5,#3730a3);color:#fff;border:none;border-radius:9px;padding:.56rem .95rem;font-family:'DM Sans',sans-serif;font-size:.83rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s;display:flex;align-items:center;gap:.32rem}
-.sug-add-btn:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(79,70,229,.4)}
-.sug-add-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.sug-list{padding:.4rem 0}
-.sug-item{display:flex;align-items:center;gap:.65rem;padding:.7rem 1.1rem;border-bottom:1px solid var(--border);transition:background .15s}
-.sug-item:last-child{border-bottom:none}
-.sug-item:hover{background:var(--cream)}
-.sug-type-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.sug-type-main{background:#4f46e5}
-.sug-type-side{background:#f59e0b}
-.sug-info{flex:1;min-width:0}
-.sug-name{font-weight:700;font-size:.88rem;color:var(--text);font-family:'Noto Sans Malayalam','DM Sans',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sug-meta{font-size:.68rem;color:var(--muted);margin-top:.08rem}
-.sug-vote-row{display:flex;align-items:center;gap:.3rem;flex-shrink:0}
-.vote-btn{width:32px;height:32px;border-radius:9px;border:2px solid var(--border);background:var(--cream);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.8rem;transition:all .2s;flex-shrink:0;touch-action:manipulation}
-.vote-btn:hover{transform:scale(1.08)}
-.vote-btn.voted-up{background:#d1fae5;border-color:var(--present);color:var(--present)}
-.vote-btn.voted-down{background:#fee2e2;border-color:var(--absent);color:var(--absent)}
-.vote-count{font-size:.75rem;font-weight:700;color:var(--muted);min-width:14px;text-align:center}
-.sug-net{font-size:.68rem;font-weight:700;padding:.1rem .38rem;border-radius:20px}
-.sug-net-pos{background:#d1fae5;color:#065f46}
-.sug-net-neg{background:#fee2e2;color:#991b1b}
-.sug-net-zero{background:var(--cream);color:var(--muted);border:1px solid var(--border)}
-.sug-empty{text-align:center;padding:1.4rem;color:var(--muted);font-size:.83rem}
-
-/* TOAST */
-.toast{position:fixed;bottom:1.3rem;left:50%;transform:translateX(-50%) translateY(100px);background:#1a1a1a;color:#fff;padding:.6rem 1.2rem;border-radius:30px;font-size:.8rem;font-weight:500;z-index:9999;transition:transform .3s,opacity .3s;opacity:0;pointer-events:none;max-width:90vw;text-align:center}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-.toast.success{background:var(--present)}
-.toast.error{background:var(--absent)}
-
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-</style>
-</head>
-<body>
-<div id="bg"></div>
-<div id="root">
-
-  <!-- ═══ AUTH SCREEN ═══ -->
-  <div id="authScreen">
-    <div class="auth-brand">
-      <div class="auth-brand-icon"><i class="fa-solid fa-utensils"></i></div>
-      <h1>Office Canteen</h1>
-      <p>Mark attendance &amp; rate your meal</p>
-    </div>
-
-    <div class="auth-card">
-      <div class="auth-tabs">
-        <div class="auth-tab active" id="atab-login"    onclick="switchTab('login')">Sign In</div>
-        <div class="auth-tab"        id="atab-register" onclick="switchTab('register')">Register</div>
-        <div class="auth-tab"        id="atab-find"     onclick="switchTab('find')">Forgot?</div>
-      </div>
-
-      <!-- LOGIN -->
-      <div class="auth-panel active" id="apanel-login">
-        <div id="returningPill" style="display:none">
-          <div class="user-pill">
-            <div class="user-pill-avatar" id="pillAvatar">?</div>
-            <div>
-              <div class="user-pill-name ml" id="pillName">—</div>
-              <div class="user-pill-sub" id="pillUsername">—</div>
-            </div>
-            <button class="pill-clear" onclick="clearSaved()" title="Not you?"><i class="fa-solid fa-xmark"></i></button>
-          </div>
-          <button class="btn btn-green" id="quickSignInBtn" onclick="doQuickLogin()">
-            <i class="fa-solid fa-right-to-bracket"></i> Sign In
-          </button>
-          <div id="quickLoginMsg" class="msg"></div>
-          <div class="auth-switch" style="margin-top:.85rem">Different account? <a onclick="clearSaved()">Use username</a></div>
-        </div>
-        <div id="manualLoginForm">
-          <div class="field">
-            <label>Username</label>
-            <input type="text" id="l-username" placeholder="your.username" autocomplete="username"
-                   autocapitalize="none" spellcheck="false"
-                   onkeydown="if(event.key==='Enter')doLogin()">
-          </div>
-          <button class="btn btn-green" id="loginBtn" onclick="doLogin()">
-            <i class="fa-solid fa-right-to-bracket"></i> Sign In
-          </button>
-          <div id="loginMsg" class="msg"></div>
-          <div class="auth-switch" style="margin-top:.85rem">
-            Don't know your username? <a onclick="switchTab('find')">Find it →</a>
-          </div>
-        </div>
-      </div>
-
-      <!-- REGISTER -->
-      <div class="auth-panel" id="apanel-register">
-        <div class="field">
-          <label>Your Full Name</label>
-          <input type="text" id="r-name" placeholder="e.g. Rahul Sharma"
-                 autocomplete="name" class="ml" oninput="autoCapitalize(this)"
-                 onkeydown="if(event.key==='Enter')document.getElementById('r-username').focus()">
-        </div>
-        <div class="field">
-          <label>Choose a Username</label>
-          <input type="text" id="r-username" placeholder="e.g. rahul.sharma"
-                 autocomplete="username" autocapitalize="none" spellcheck="false"
-                 onkeydown="if(event.key==='Enter')doRegister()">
-          <div class="hint">Only letters, numbers, dot, underscore. No spaces. <strong>Remember this!</strong></div>
-        </div>
-        <button class="btn btn-amber" id="regBtn" onclick="doRegister()">
-          <i class="fa-solid fa-user-plus"></i> Create Account
-        </button>
-        <div id="regMsg" class="msg"></div>
-        <div class="auth-switch" style="margin-top:.85rem">Already registered? <a onclick="switchTab('login')">Sign in</a></div>
-      </div>
-
-      <!-- FIND USERNAME -->
-      <div class="auth-panel" id="apanel-find">
-        <div class="find-intro">
-          <i class="fa-solid fa-magnifying-glass find-icon"></i>
-          <p>Enter your name as you registered and we'll find your username.</p>
-        </div>
-        <div class="field">
-          <label>Your Full Name</label>
-          <input type="text" id="f-name" placeholder="e.g. Rahul Sharma" class="ml"
-                 autocomplete="name" onkeydown="if(event.key==='Enter')doFind()">
-        </div>
-        <button class="btn btn-ghost" id="findBtn" onclick="doFind()">
-          <i class="fa-solid fa-magnifying-glass"></i> Find My Username
-        </button>
-        <div id="findMsg" class="msg"></div>
-        <div id="findResults"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ APP SCREEN ═══ -->
-  <div id="appScreen">
-
-    <!-- App header -->
-    <div class="app-header">
-      <div class="user-greeting">
-        <div class="label">Signed in as</div>
-        <div class="name ml" id="userName">—</div>
-        <div class="usub" id="userUsername"></div>
-      </div>
-      <div class="header-actions">
-        <button class="btn-hdr" onclick="toggleHistory()"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
-        <button class="btn-hdr btn-hdr-red" onclick="doLogout()"><i class="fa-solid fa-right-from-bracket"></i></button>
-      </div>
-    </div>
-
-    <!-- ── BILL NOTIFICATION BANNER ── -->
-    <div id="billBanner" onclick="openBillModal()">
-      <div class="bill-marquee-track" id="billMarqueeTrack">
-        <div class="bill-marquee-item" id="billMarqueeA">
-          <i class="fa-solid fa-file-invoice-dollar"></i>
-          <span class="bill-new-pill" id="billBannerPill1">NEW</span>
-          <span id="billBannerMsg1"></span>
-        </div>
-        <div class="bill-marquee-item" id="billMarqueeB" aria-hidden="true">
-          <i class="fa-solid fa-file-invoice-dollar"></i>
-          <span class="bill-new-pill" id="billBannerPill2">NEW</span>
-          <span id="billBannerMsg2"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── BILL MODAL (bottom sheet) ── -->
-    <div id="billModalOverlay" onclick="if(event.target===this)closeBillModal()">
-      <div class="bill-sheet">
-        <div class="bill-sheet-drag"></div>
-        <div class="bill-sheet-header">
-          <div class="bill-sheet-title">
-            <i class="fa-solid fa-file-invoice-dollar" style="color:#4f46e5"></i>
-            My Canteen Bill
-            <span class="bill-new-badge" id="billModalNewBadge" style="display:none">NEW</span>
-          </div>
-          <button class="bill-sheet-close" onclick="closeBillModal()"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="bill-sheet-body" id="billSheetBody">
-          <div style="text-align:center;padding:2rem"><span class="spinner"></span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- App body -->
-    <div class="app-body">
-      <div class="date-strip">
-        <span class="dot"></span>
-        <span id="dateStrip">—</span>
-        <span class="dot"></span>
-      </div>
-      <div id="mainContent"></div>
-      <div id="ratingSection"></div>
-      <div id="suggestionSection"></div>
-      <div id="historyPanel" style="display:none"></div>
-    </div>
-  </div>
-
-</div>
-<div class="toast" id="toast"></div>
-
-<script>
-// ── CONFIG ────────────────────────────────────────────────────
-// USER APP API — set this to your deployed user-app web app URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbygfxODvd7iH-LEdZEUI6F40DIpgIZ5jMjUmALOGpQ-3CHxmFmc0L41QlTCOVAa0Lzw/exec';
-
-// ── STATE ─────────────────────────────────────────────────────
-let userToken = '', userData = null, historyOpen = false;
-let currentMenu = null, userRatings = {}, pendingRatings = {};
-let todayStatus = null, myBillData = null;
-
-// ── API ───────────────────────────────────────────────────────
-function api(params) {
-  return new Promise((resolve, reject) => {
-    const cb = 'cb_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
-    const qs = Object.entries({...params, callback: cb})
-      .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-    const s = document.createElement('script');
-    const t = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 15000);
-    window[cb] = d => { cleanup(); resolve(d); };
-    function cleanup() { clearTimeout(t); delete window[cb]; s.remove(); }
-    s.onerror = () => { cleanup(); reject(new Error('Network error')); };
-    s.src = API_URL + '?' + qs;
-    document.head.appendChild(s);
-  });
-}
-
-// ── UTILS ─────────────────────────────────────────────────────
-function autoCapitalize(input) {
-  const pos = input.selectionStart;
-  input.value = input.value.replace(/\b\w/g, c => c.toUpperCase());
-  try { input.setSelectionRange(pos, pos); } catch(e) {}
-}
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function escA(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
-function showMsg(id, t, type) {
-  const el = document.getElementById(id); if (!el) return;
-  el.textContent = t; el.className = 'msg ' + (type || '') + ' show';
-}
-let tT;
-function toast(msg, type = '') {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.className = 'toast show' + (type ? ' ' + type : '');
-  clearTimeout(tT); tT = setTimeout(() => el.className = 'toast', 3200);
-}
-function fmtAmt(n) {
-  return parseFloat(n || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-}
-
-// ── INIT ─────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('dateStrip').textContent = new Date().toLocaleDateString('en-IN', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-  });
-  userToken = localStorage.getItem('userToken') || '';
-  userData  = JSON.parse(localStorage.getItem('userData') || 'null');
-  const su  = localStorage.getItem('savedUsername') || '';
-  const sn  = localStorage.getItem('savedName') || '';
-  if (userToken && userData) { showApp(userData); return; }
-  switchTab('login');
-  if (su && sn) {
-    document.getElementById('returningPill').style.display = 'block';
-    document.getElementById('manualLoginForm').style.display = 'none';
-    document.getElementById('pillName').textContent = sn;
-    document.getElementById('pillUsername').textContent = '@' + su;
-    document.getElementById('pillAvatar').textContent = (sn[0] || '?').toUpperCase();
-  } else {
-    document.getElementById('returningPill').style.display = 'none';
-    document.getElementById('manualLoginForm').style.display = 'block';
+function doGet(e) {
+  const callback = e.parameter.callback;
+  try {
+    const result = handleAction(e.parameter);
+    const json   = JSON.stringify(result);
+    if (callback) return ContentService.createTextOutput(callback+'('+json+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    const errJson = JSON.stringify({success:false, message:err.toString()});
+    if (callback) return ContentService.createTextOutput(callback+'('+errJson+')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    return ContentService.createTextOutput(errJson).setMimeType(ContentService.MimeType.JSON);
   }
-});
-
-// ── AUTH TABS ─────────────────────────────────────────────────
-function switchTab(name) {
-  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('atab-' + name).classList.add('active');
-  document.getElementById('apanel-' + name).classList.add('active');
-}
-function clearSaved() {
-  document.getElementById('returningPill').style.display = 'none';
-  document.getElementById('manualLoginForm').style.display = 'block';
-  document.getElementById('l-username').focus();
 }
 
-// ── LOGIN / REGISTER / FIND ────────────────────────────────────
-async function doQuickLogin() {
-  const su = localStorage.getItem('savedUsername') || '';
-  if (!su) { clearSaved(); return; }
-  const btn = document.getElementById('quickSignInBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px"></span> Signing in…';
+function handleAction(params) {
+  const props    = PropertiesService.getScriptProperties();
+  const SECRET   = props.getProperty('SECRET_KEY') || 'canteen2024';
+  const SHEET_ID = props.getProperty('SHEET_ID')   || '1NlR7zd_eH-pZCCaEyGPtK-cNAbl3es4GTxFVnyacyow';
+  const ss       = SpreadsheetApp.openById(SHEET_ID);
+
+  switch(params.action) {
+    case 'register':              return registerUser(ss, params, SECRET);
+    case 'login':                 return loginUser(ss, params, SECRET);
+    case 'findUsername':          return findUsername(ss, params);
+    case 'updateDietPref':        return updateDietPref(ss, params, SECRET);
+    case 'getMenu':               return getMenu(ss, params);
+    case 'setMenu':               return setMenu(ss, params);
+    case 'getWeeklyMenu':         return getWeeklyMenu(ss);
+    case 'setWeeklyMenu':         return setWeeklyMenu(ss, params);
+    case 'getMasterList':         return getMasterList(ss);
+    case 'addMasterItem':         return addMasterItem(ss, params);
+    case 'deleteMasterItem':      return deleteMasterItem(ss, params);
+    case 'markAttendance':        return markAttendance(ss, params, SECRET);
+    case 'adminMarkAttendance':   return adminMarkAttendance(ss, params);
+    case 'checkAttendance':       return checkAttendance(ss, params, SECRET);
+    case 'getMyAttendance':       return getMyAttendance(ss, params, SECRET);
+    case 'submitRating':          return submitRating(ss, params, SECRET);
+    case 'getMyRatings':          return getMyRatings(ss, params, SECRET);
+    case 'getRatings':            return getRatings(ss, params);
+    case 'getCumulativeRatings':  return getCumulativeRatings(ss);
+    case 'getStats':              return getStats(ss);
+    case 'getAttendanceSummary':  return getAttendanceSummary(ss, params);
+    case 'getMonthlyData':        return getMonthlyData(ss, params);
+    case 'getMonthlyReport':      return getMonthlyReport(ss, params);
+    case 'getAllUsers':            return getAllUsers(ss);
+    case 'getImages':             return getImages(ss);
+    case 'addImage':              return addImage(ss, params);
+    case 'deleteImage':           return deleteImage(ss, params);
+    case 'submitSuggestion':      return submitSuggestion(ss, params, SECRET);
+    case 'getSuggestions':        return getSuggestions(ss, params);
+    case 'voteSuggestion':        return voteSuggestion(ss, params, SECRET);
+    case 'deleteSuggestion':      return deleteSuggestion(ss, params);
+    case 'addExpense':            return addExpense(ss, params);
+    case 'getExpenses':           return getExpenses(ss, params);
+    case 'deleteExpense':         return deleteExpense(ss, params);
+    case 'calculateBills':        return calculateBills(ss, params);
+    case 'getUserBills':          return getUserBills(ss, params, SECRET);
+    case 'getAllBillsManager':    return getAllBillsManager(ss, params);
+    case 'markBillSeen':          return markBillSeen(ss, params, SECRET);
+    case 'archiveBillPeriod':     return archiveBillPeriod(ss, params);
+    case 'setTeaAllUsers':        return setTeaAllUsers(ss, params);   // ← PRIMARY: 1 call for all users
+    case 'setTeaBothSessions':    return setTeaBothSessions(ss, params); // kept for compat
+    case 'setTeaRecord':          return setTeaRecord(ss, params);       // kept for compat
+    case 'setTeaAttendance':      return setTeaAttendance(ss, params);   // kept for compat
+    case 'getTeaAttendance':      return getTeaAttendance(ss, params);
+    case 'getTeaCountForPeriod':  return getTeaCountForPeriod(ss, params);
+    case 'ping':                  return {success:true, message:'Canteen API v6 alive!'};
+    default:                      return {success:false, message:'Unknown action: '+params.action};
+  }
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+
+function hashStr(str) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, str, Utilities.Charset.UTF_8);
+  return bytes.map(b => ('0'+(b&0xFF).toString(16)).slice(-2)).join('');
+}
+function makeUserToken(username, secret) {
+  return Utilities.base64EncodeWebSafe(username+':'+hashStr(username+secret));
+}
+function verifyUserToken(ss, token, secret) {
+  if (!token) return null;
   try {
-    const res = await api({action: 'login', username: su});
-    if (res.success) { saveSession(res); showApp(res); }
-    else showMsg('quickLoginMsg', res.message, 'error');
-  } catch(e) { showMsg('quickLoginMsg', 'Connection error. Try again.', 'error'); }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
-}
-
-async function doLogin() {
-  const uname = document.getElementById('l-username').value.trim().toLowerCase();
-  if (!uname) { showMsg('loginMsg', 'Please enter your username', 'error'); return; }
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px"></span> Signing in…';
-  try {
-    const res = await api({action: 'login', username: uname});
-    if (res.success) { saveSession(res); showApp(res); }
-    else showMsg('loginMsg', res.message, 'error');
-  } catch(e) { showMsg('loginMsg', 'Connection error. Try again.', 'error'); }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
-}
-
-async function doRegister() {
-  const name  = document.getElementById('r-name').value.trim();
-  const uname = document.getElementById('r-username').value.trim().toLowerCase().replace(/\s+/g, '');
-  if (!name)  { showMsg('regMsg', 'Please enter your full name', 'error'); return; }
-  if (!uname) { showMsg('regMsg', 'Please choose a username', 'error'); return; }
-  if (!/^[a-z0-9._]+$/.test(uname)) { showMsg('regMsg', 'Username: only letters, numbers, dot, underscore', 'error'); return; }
-  const btn = document.getElementById('regBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px"></span> Creating…';
-  try {
-    const res = await api({action: 'register', name, username: uname});
-    if (res.success) { saveSession(res); showApp(res); toast('Welcome, ' + res.name + '! 🎉', 'success'); }
-    else showMsg('regMsg', res.message, 'error');
-  } catch(e) { showMsg('regMsg', 'Connection error. Try again.', 'error'); }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account';
-}
-
-async function doFind() {
-  const name = document.getElementById('f-name').value.trim();
-  if (name.length < 2) { showMsg('findMsg', 'Enter at least 2 characters of your name', 'error'); return; }
-  const btn = document.getElementById('findBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px"></span> Searching…';
-  document.getElementById('findResults').innerHTML = '';
-  try {
-    const res = await api({action: 'findUsername', name});
-    if (res.success && res.matches && res.matches.length) {
-      showMsg('findMsg', '', '');
-      document.getElementById('findResults').innerHTML = res.matches.map(m => `
-        <div class="find-result-item">
-          <div>
-            <div class="find-result-name ml">${esc(m.name)}</div>
-            <div class="find-result-un">@${esc(m.username)}</div>
-          </div>
-          <button class="find-use-btn" onclick="useFoundUsername('${escA(m.username)}','${escA(m.name)}')">Sign In →</button>
-        </div>`).join('');
-    } else {
-      showMsg('findMsg', res.message || 'No account found with that name', 'error');
+    const dec  = Utilities.newBlob(Utilities.base64DecodeWebSafe(token)).getDataAsString();
+    const idx  = dec.indexOf(':');
+    const user = dec.substring(0,idx);
+    if (dec.substring(idx+1) !== hashStr(user+secret)) return null;
+    const sheet = ss.getSheetByName('Users'); if (!sheet) return null;
+    const data  = sheet.getDataRange().getValues();
+    for (let i=1;i<data.length;i++) {
+      if (String(data[i][1]).toLowerCase()===user.toLowerCase()) {
+        const u = parseUserRow(data[i]);
+        return {id:u.id, username:u.username, name:u.name, dietPref:u.dietPref};
+      }
     }
-  } catch(e) { showMsg('findMsg', 'Connection error. Try again.', 'error'); }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Find My Username';
+  } catch(e){}
+  return null;
 }
-
-async function useFoundUsername(username, name) {
-  toast('Signing in as ' + name + '…');
-  try {
-    const res = await api({action: 'login', username});
-    if (res.success) { saveSession(res); showApp(res); }
-    else toast(res.message, 'error');
-  } catch(e) { toast('Connection error', 'error'); }
-}
-
-function saveSession(res) {
-  userToken = res.token;
-  userData  = {name: res.name, username: res.username};
-  localStorage.setItem('userToken', userToken);
-  localStorage.setItem('userData', JSON.stringify(userData));
-  localStorage.setItem('savedUsername', res.username);
-  localStorage.setItem('savedName', res.name);
-}
-
-function doLogout() {
-  userToken = ''; userData = null; todayStatus = null; myBillData = null;
-  localStorage.removeItem('userToken');
-  localStorage.removeItem('userData');
-  document.getElementById('billBanner').style.display = 'none';
-  document.getElementById('billModalOverlay').classList.remove('open');
-  document.getElementById('authScreen').style.display = 'flex';
-  document.getElementById('appScreen').style.display = 'none';
-  const su = localStorage.getItem('savedUsername') || '';
-  const sn = localStorage.getItem('savedName') || '';
-  switchTab('login');
-  if (su && sn) {
-    document.getElementById('returningPill').style.display = 'block';
-    document.getElementById('manualLoginForm').style.display = 'none';
-    document.getElementById('pillName').textContent = sn;
-    document.getElementById('pillUsername').textContent = '@' + su;
-    document.getElementById('pillAvatar').textContent = (sn[0] || '?').toUpperCase();
-  } else {
-    document.getElementById('returningPill').style.display = 'none';
-    document.getElementById('manualLoginForm').style.display = 'block';
+function getOrCreateSheet(ss, name, headers) {
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow(headers); sh.setFrozenRows(1);
+    sh.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground('#2d6a4f').setFontColor('#ffffff');
   }
+  return sh;
 }
-
-function showApp(user) {
-  document.getElementById('authScreen').style.display = 'none';
-  document.getElementById('appScreen').style.display = 'flex';
-  document.getElementById('userName').textContent = user.name;
-  document.getElementById('userUsername').textContent = '@' + user.username;
-  checkAndShowBillBanner(); // ← bill notification
-  loadMenuAndAttendance();
-}
-
-// ══════════════════════════════════════════════════════════════
-//  BILL BANNER + MODAL
-// ══════════════════════════════════════════════════════════════
-
-async function checkAndShowBillBanner() {
+function todayIST() { return Utilities.formatDate(new Date(),'Asia/Kolkata','yyyy-MM-dd'); }
+function toDateStr(val) {
   try {
-    const res = await api({action: 'getUserBills', token: userToken});
-    if (!res.success || !res.bills || !res.bills.length) return;
+    if (!val) return '';
+    if (val instanceof Date) return Utilities.formatDate(val,'Asia/Kolkata','yyyy-MM-dd');
+    const d=new Date(val); if(!isNaN(d)) return Utilities.formatDate(d,'Asia/Kolkata','yyyy-MM-dd');
+    return String(val).substring(0,10);
+  } catch(e){ return String(val).substring(0,10); }
+}
+function capName(n){ return String(n).replace(/\b\w/g,c=>c.toUpperCase()); }
 
-    // Find the most recent non-archived bill that is within 7 days of creation
-    const now = Date.now();
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    const bill = res.bills.find(b => {
-      if (b.archived) return false;
-      if (!b.createdAt) return true; // if no date, always show
-      const created = new Date(b.createdAt).getTime();
-      return (now - created) <= SEVEN_DAYS_MS;
-    }) || res.bills.find(b => !b.archived); // fallback: any non-archived
+// ── ROW PARSERS ───────────────────────────────────────────────
 
-    if (!bill) return;
-    myBillData = bill;
+function parseUserRow(row) {
+  const isNew = row.length >= 5;
+  return {
+    id:        String(row[0]),
+    username:  String(row[1]),
+    name:      String(row[2]),
+    dietPref:  isNew ? (String(row[3]||'veg')) : 'veg',
+    createdAt: isNew ? row[4] : row[3]
+  };
+}
+function parseAttRow(row) {
+  return {
+    date:     toDateStr(row[0]),
+    userId:   String(row[1]),
+    username: String(row[2]),
+    name:     String(row[3]),
+    status:   String(row[4]),
+    mealType: String(row[5]||'veg'),
+    markedAt: row[6],
+    markedBy: String(row[7]||'user')
+  };
+}
+function parseMLRow(row) {
+  const isNew    = row.length >= 5;
+  const isVegRaw = isNew ? row[3] : true;
+  return {
+    id:      String(row[0]),
+    name:    String(row[1]),
+    type:    String(row[2]),
+    isVeg:   (isVegRaw===true||isVegRaw==='TRUE'||isVegRaw==='true'||isVegRaw===1),
+    addedAt: isNew ? row[4] : row[3]
+  };
+}
+function parseTeaRow(row) {
+  return {
+    id:         String(row[0]),
+    date:       toDateStr(row[1]),
+    userId:     String(row[2]),
+    username:   String(row[3]),
+    name:       String(row[4]),
+    session:    String(row[5]),
+    teaType:    String(row[6]),
+    recordedAt: row[7]
+  };
+}
 
-    // Days since bill was created
-    const createdAt = bill.createdAt ? new Date(bill.createdAt).getTime() : now;
-    const daysSince = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+// ── USERS ─────────────────────────────────────────────────────
 
-    // isNew = within 7 days AND not yet seen
-    const isNew = daysSince <= 7 && !bill.seenAt;
-
-    const amt    = '₹' + fmtAmt(bill.totalBill);
-    const period = formatPeriod(bill.periodFrom, bill.periodTo);
-    const daysLeft = Math.max(0, 7 - daysSince);
-
-    const msg = isNew
-      ? `🆕 New bill ready! ${period} · ${amt} — Tap to view  (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`
-      : `📋 Bill for ${period} · ${amt} — Tap to view  (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`;
-
-    document.getElementById('billBannerMsg1').textContent = msg;
-    document.getElementById('billBannerMsg2').textContent = msg;
-
-    // NEW pill only shows when genuinely unseen within 7 days
-    document.getElementById('billBannerPill1').style.display = isNew ? 'inline-flex' : 'none';
-    document.getElementById('billBannerPill2').style.display = isNew ? 'inline-flex' : 'none';
-
-    document.getElementById('billBanner').style.display = 'block';
-  } catch(e) {
-    // Silently fail — bill banner is non-critical
+function registerUser(ss,p,secret) {
+  const sh = getOrCreateSheet(ss,'Users',['ID','Username','Name','DietPref','CreatedAt']);
+  const d  = sh.getDataRange().getValues();
+  const un = (p.username||'').trim().toLowerCase().replace(/\s+/g,'');
+  const nm = capName((p.name||'').trim());
+  const dp = p.dietPref==='nonveg' ? 'nonveg' : 'veg';
+  if (!un||!nm) return {success:false,message:'Name and username required'};
+  if (!/^[a-z0-9._]+$/.test(un)) return {success:false,message:'Username: letters, numbers, dot, underscore only'};
+  for (let i=1;i<d.length;i++) if (String(d[i][1]).toLowerCase()===un) return {success:false,message:'Username "'+un+'" is taken.'};
+  const id='U'+Date.now();
+  sh.appendRow([id,un,nm,dp,new Date().toISOString()]);
+  return {success:true,token:makeUserToken(un,secret),name:nm,username:un,dietPref:dp,message:'Welcome '+nm+'!'};
+}
+function loginUser(ss,p,secret) {
+  const sh=ss.getSheetByName('Users'); if (!sh) return {success:false,message:'No users registered yet'};
+  const un=(p.username||'').trim().toLowerCase();
+  const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) if (String(d[i][1]).toLowerCase()===un) {
+    const u=parseUserRow(d[i]);
+    return {success:true,token:makeUserToken(un,secret),name:u.name,username:un,dietPref:u.dietPref};
   }
+  return {success:false,message:'Username not found. Please register.'};
 }
-
-function parseAnyDate(val) {
-  if (!val) return null;
-  const s = String(val).trim();
-  // yyyy-mm-dd  (ISO — most common from Apps Script toDateStr)
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s + 'T00:00:00');
-  // dd-mm-yyyy  or  dd/mm/yyyy
-  const dmy = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
-  if (dmy) return new Date(+dmy[3], +dmy[2]-1, +dmy[1]);
-  // mm/dd/yyyy  (US locale fallback)
-  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (mdy) return new Date(+mdy[3], +mdy[1]-1, +mdy[2]);
-  // Native parse as last resort (handles ISO full timestamps)
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
+function findUsername(ss,p) {
+  const sh=ss.getSheetByName('Users'); if (!sh) return {success:false,message:'No users found'};
+  const query=(p.name||'').trim().toLowerCase();
+  if (!query||query.length<2) return {success:false,message:'Enter at least 2 characters'};
+  const d=sh.getDataRange().getValues(); const matches=[];
+  for (let i=1;i<d.length;i++) if (String(d[i][2]).toLowerCase().includes(query))
+    matches.push({username:d[i][1],name:d[i][2]});
+  if (!matches.length) return {success:false,message:'No account found with that name'};
+  return {success:true,matches};
 }
-
-function formatPeriod(from, to) {
-  if (!from && !to) return '';
-  try {
-    const f = parseAnyDate(from);
-    const t = parseAnyDate(to);
-    // If parsing failed just show raw strings — never show "Invalid Date"
-    if (!f || !t) return String(from || '') + ' – ' + String(to || '');
-    const opts = {day: 'numeric', month: 'short'};
-    return f.toLocaleDateString('en-IN', opts) + ' – ' + t.toLocaleDateString('en-IN', opts);
-  } catch(e) { return String(from || '') + ' – ' + String(to || ''); }
+function updateDietPref(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const dp=p.dietPref==='nonveg'?'nonveg':'veg';
+  const sh=ss.getSheetByName('Users'); if (!sh) return {success:false};
+  const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) if (d[i][0]===user.id) { sh.getRange(i+1,4).setValue(dp); return {success:true,dietPref:dp}; }
+  return {success:false};
 }
-
-function openBillModal() {
-  if (!myBillData) { checkAndShowBillBanner(); return; }
-  renderBillSheet(myBillData);
-  document.getElementById('billModalOverlay').classList.add('open');
-  // Mark seen if not yet seen — non-blocking, fire and forget
-  if (myBillData.id && !myBillData.seenAt) {
-    setTimeout(() => {
-      api({action: 'markBillSeen', token: userToken, id: myBillData.id})
-        .then(() => { myBillData.seenAt = new Date().toISOString(); })
-        .catch(() => {});
-    }, 1500);
+function getAllUsers(ss) {
+  const sh=ss.getSheetByName('Users'); if (!sh) return {success:true,users:[]};
+  const d=sh.getDataRange().getValues(); const users=[];
+  for (let i=1;i<d.length;i++) if (d[i][0]) {
+    const u=parseUserRow(d[i]);
+    users.push({id:u.id,username:u.username,name:u.name,dietPref:u.dietPref,joinedAt:u.createdAt});
   }
+  return {success:true,users};
 }
 
-function closeBillModal() {
-  document.getElementById('billModalOverlay').classList.remove('open');
+// ── MASTER LIST ───────────────────────────────────────────────
+
+function getMasterList(ss) {
+  const sh=getOrCreateSheet(ss,'MasterList',['ID','ItemName','ItemType','IsVeg','AddedAt']);
+  const d=sh.getDataRange().getValues(); const items=[];
+  for (let i=1;i<d.length;i++) if (d[i][0]) items.push(parseMLRow(d[i]));
+  return {success:true,items};
+}
+function addMasterItem(ss,p) {
+  const name=(p.name||'').trim(); const type=p.type==='side'?'side':'main';
+  const isVeg=(p.isVeg==='false'||p.isVeg===false)?false:true;
+  if (!name) return {success:false,message:'Item name required'};
+  const sh=getOrCreateSheet(ss,'MasterList',['ID','ItemName','ItemType','IsVeg','AddedAt']);
+  const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) if (String(d[i][1])===name&&d[i][2]===type) return {success:false,message:'Already in list.'};
+  const id='ML_'+Date.now();
+  sh.appendRow([id,name,type,isVeg,new Date().toISOString()]);
+  return {success:true,item:{id,name,type,isVeg},message:'Added!'};
+}
+function deleteMasterItem(ss,p) {
+  const sh=ss.getSheetByName('MasterList'); if (!sh) return {success:false,message:'Not found'};
+  const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) if (String(d[i][0])===String(p.id)) { sh.deleteRow(i+1); return {success:true}; }
+  return {success:false,message:'Item not found'};
 }
 
-function renderBillSheet(b) {
-  const now       = Date.now();
-  const SEVEN_MS  = 7 * 24 * 60 * 60 * 1000;
-  const created   = b.createdAt ? new Date(b.createdAt).getTime() : now;
-  const within7   = (now - created) <= SEVEN_MS;
-  const isNew     = within7 && !b.seenAt && !b.archived;
-  const dietLabel = b.dietPref === 'nonveg' ? '🍗 Non-Vegetarian' : '🥦 Vegetarian';
-  const amt       = fmtAmt(b.totalBill);
-  const mealBill  = (parseFloat(b.daysPresent) * parseFloat(b.baseCostPerMeal || 0)) +
-                    (parseFloat(b.nonVegMeals  || 0) * parseFloat(b.meatCostPerMeal || 0));
-  const teaBill   = parseFloat(b.teaBill || 0);
-  const hasMeat   = parseFloat(b.meatCostPerMeal || 0) > 0 && parseInt(b.nonVegMeals || 0) > 0;
-  const hasTea    = (parseInt(b.teaServings || 0) + parseInt(b.blackTeaServings || 0)) > 0;
+// ── MENU ──────────────────────────────────────────────────────
 
-  // Badge visibility
-  document.getElementById('billModalNewBadge').style.display = isNew ? 'inline-flex' : 'none';
-
-  document.getElementById('billSheetBody').innerHTML = `
-    <div class="bill-period-badge">
-      <i class="fa-solid fa-calendar-range"></i>
-      ${esc(formatPeriod(b.periodFrom, b.periodTo))}
-    </div>
-
-    <div class="bill-total-box">
-      <div class="bill-total-label">Total amount due</div>
-      <div class="bill-total-amount">₹${esc(amt)}</div>
-    </div>
-
-    <div class="bill-diet-row">
-      <i class="fa-solid fa-circle-info"></i>
-      Diet preference: <strong>${dietLabel}</strong>
-    </div>
-
-    <div class="bill-breakdown">
-      <table>
-        <tr>
-          <td><i class="fa-solid fa-calendar-check" style="color:var(--green)"></i> Days present</td>
-          <td><strong>${b.daysPresent}</strong> days</td>
-        </tr>
-        <tr>
-          <td><i class="fa-solid fa-leaf" style="color:var(--green)"></i> Veg meals</td>
-          <td>${b.vegMeals}</td>
-        </tr>
-        ${parseInt(b.nonVegMeals || 0) > 0 ? `
-        <tr>
-          <td><i class="fa-solid fa-drumstick-bite" style="color:#dc2626"></i> Non-veg meals</td>
-          <td>${b.nonVegMeals}</td>
-        </tr>` : ''}
-        <tr>
-          <td><i class="fa-solid fa-receipt" style="color:var(--amber)"></i> Base cost / meal</td>
-          <td>₹${fmtAmt(b.baseCostPerMeal)}</td>
-        </tr>
-        ${hasMeat ? `
-        <tr>
-          <td><i class="fa-solid fa-drumstick-bite" style="color:#dc2626"></i> Meat surcharge / meal</td>
-          <td>₹${fmtAmt(b.meatCostPerMeal)}</td>
-        </tr>` : ''}
-        <tr>
-          <td><i class="fa-solid fa-bowl-food" style="color:var(--amber)"></i> Meal charges total</td>
-          <td>₹${fmtAmt(mealBill)}</td>
-        </tr>
-        ${hasTea ? `
-        <tr>
-          <td><i class="fa-solid fa-mug-hot" style="color:#92400e"></i>
-            Tea: ${b.teaServings || 0} ☕ + ${b.blackTeaServings || 0} 🖤</td>
-          <td>₹${fmtAmt(b.teaBill)}</td>
-        </tr>` : ''}
-        <tr class="bill-total-row">
-          <td><i class="fa-solid fa-indian-rupee-sign" style="color:#4f46e5"></i> Total Bill</td>
-          <td>₹${esc(amt)}</td>
-        </tr>
-      </table>
-    </div>
-
-    ${b.archived ? `
-    <div style="margin-top:12px;background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:12px;color:#64748b;display:flex;align-items:center;gap:6px">
-      <i class="fa-solid fa-box-archive"></i> This bill has been archived.
-    </div>` : ''}
-  `;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  MENU + ATTENDANCE
-// ══════════════════════════════════════════════════════════════
-
-async function loadMenuAndAttendance() {
-  document.getElementById('mainContent').innerHTML = `
-    <div class="loading-card">
-      <span class="spinner" style="width:32px;height:32px;border-width:3px;display:block;margin:0 auto .85rem"></span>
-      <p style="color:var(--muted);font-size:.85rem">Loading today's menu…</p>
-    </div>`;
-  document.getElementById('ratingSection').innerHTML = '';
-  try {
-    const [menuRes, attRes, ratRes] = await Promise.all([
-      api({action: 'getMenu'}),
-      api({action: 'checkAttendance', token: userToken}),
-      api({action: 'getMyRatings',    token: userToken})
-    ]);
-    if (attRes.message?.includes('session')) { doLogout(); return; }
-    currentMenu  = menuRes.menu;
-    userRatings  = ratRes.ratings || {};
-    pendingRatings = {};
-    todayStatus  = attRes.marked ? attRes.status : null;
-    if (!currentMenu) {
-      document.getElementById('mainContent').innerHTML = `
-        <div class="no-menu-card">
-          <span class="nm-icon">🍽️</span>
-          <h2>Menu Not Set Yet</h2>
-          <p>Today's menu hasn't been announced. Check back later!</p>
-        </div>`;
-      return;
+function getMenu(ss,p) {
+  const date=p.date||todayIST();
+  const sh=ss.getSheetByName('Menu');
+  if (sh) {
+    const d=sh.getDataRange().getValues();
+    for (let i=1;i<d.length;i++) if (toDateStr(d[i][0])===date) {
+      let sd=[]; try{sd=JSON.parse(d[i][3]||'[]');}catch(e){}
+      const isVegMain=d[i][5]!==undefined?(d[i][5]===true||d[i][5]==='TRUE'):true;
+      return {success:true,menu:{date,mainCourse:d[i][1],mainCourseIsVeg:isVegMain,mainCourseImg:d[i][2],sideDishes:sd,isPureVeg:isVegMain&&sd.every(s=>s.isVeg!==false),setAt:d[i][6]},date};
     }
-    renderMenuCard(currentMenu, attRes);
-    if (!attRes.marked || attRes.status === 'present') renderRatingSection(currentMenu);
-    loadSuggestions();
-  } catch(e) {
-    document.getElementById('mainContent').innerHTML = `
-      <div class="no-menu-card">
-        <span class="nm-icon">⚠️</span>
-        <h2>Connection Error</h2>
-        <p><a href="#" onclick="loadMenuAndAttendance()" style="color:var(--amber)">Try again</a></p>
-      </div>`;
   }
-}
-
-function renderMenuCard(menu, attRes) {
-  const isVegMain = menu.mainCourseIsVeg !== false;
-  const isPureVeg = menu.isPureVeg;
-  const heroHtml  = menu.mainCourseImg
-    ? `<img src="${esc(menu.mainCourseImg)}" class="menu-hero" loading="eager" alt=""
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-    : '';
-  const heroPH = !menu.mainCourseImg
-    ? `<div class="menu-hero-placeholder">🍱</div>`
-    : `<div class="menu-hero-placeholder" style="display:none">🍱</div>`;
-
-  const vegBadge   = isVegMain
-    ? '<span class="veg-badge">🟢 Veg</span>'
-    : '<span class="nonveg-badge">🔴 Non-Veg</span>';
-  const pureVegStrip = isPureVeg
-    ? `<div class="pure-veg-strip"><i class="fa-solid fa-leaf"></i> Pure Veg Day — Let's go vegan today!</div>`
-    : '';
-
-  const sidesHtml = (menu.sideDishes || []).length
-    ? `<div class="sides-section">
-        <div class="sides-label"><i class="fa-solid fa-leaf" style="color:var(--green);font-size:.72rem"></i> Side Dishes</div>
-        ${menu.sideDishes.map(s => {
-          const sImg = s.imgUrl
-            ? `<img src="${esc(s.imgUrl)}" class="side-dish-img" alt=""
-                   onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-               <div class="side-dish-img-placeholder" style="display:none">🥗</div>`
-            : `<div class="side-dish-img-placeholder">🥗</div>`;
-          const sVeg = s.isVeg !== false;
-          return `<div class="side-dish-item">
-                    ${sImg}
-                    <div class="side-dish-name">${esc(s.name || '')}</div>
-                    ${sVeg
-                      ? '<span class="veg-badge" style="margin-left:auto">🟢</span>'
-                      : '<span class="nonveg-badge" style="margin-left:auto">🔴</span>'}
-                  </div>`;
-        }).join('')}
-      </div>`
-    : '';
-
-  const attHtml = attRes.marked ? buildMarkedHtml(attRes.status, attRes.mealType) : `
-    <div class="att-question"><i class="fa-solid fa-circle-question"></i> Will you have lunch today?</div>
-    <div class="att-buttons">
-      <button class="att-btn att-btn-present" onclick="markAtt('present')">
-        <span class="att-icon">✅</span><span class="att-label">Yes, I'll eat!</span>
-      </button>
-      <button class="att-btn att-btn-absent" onclick="markAtt('absent')">
-        <span class="att-icon">🚫</span><span class="att-label">No, I'll skip</span>
-      </button>
-    </div>`;
-
-  document.getElementById('mainContent').innerHTML = `
-    <div class="menu-card">
-      ${heroHtml}${heroPH}
-      <div class="menu-card-body">
-        <div class="menu-label"><i class="fa-solid fa-star"></i> Today's Main Course</div>
-        <div class="menu-name ml">${esc(menu.mainCourse)} ${vegBadge}</div>
-        ${pureVegStrip}
-        ${sidesHtml}
-        <div class="menu-divider"></div>
-        <div id="attendanceSection">${attHtml}</div>
-      </div>
-    </div>`;
-}
-
-function buildMarkedHtml(status, mealType) {
-  const present = status === 'present';
-  const nonveg  = mealType === 'nonveg';
-  const mealBadge = present
-    ? (nonveg ? '<span class="nonveg-badge">🔴 Non-Veg</span>' : '<span class="veg-badge">🟢 Veg</span>')
-    : '';
-  const changeBtn = !present
-    ? `<button class="change-btn" onclick="markAtt('present')">
-        <i class="fa-solid fa-circle-check"></i> Changed my mind — I'll eat today!
-       </button>`
-    : `<div class="locked-note"><i class="fa-solid fa-lock"></i> Cannot opt out after confirming</div>`;
-  return `<div class="att-marked ${status}" style="display:flex;flex-direction:column;align-items:center">
-    <span class="marked-icon">${present ? '✅' : '🚫'}</span>
-    <div class="marked-title">${present ? 'Attending Lunch!' : 'Skipping Today'} ${mealBadge}</div>
-    <div class="marked-sub">${present
-      ? 'Your attendance is confirmed. Enjoy your meal!'
-      : 'You\'ve marked absent for today.'}</div>
-    ${changeBtn}
-  </div>`;
-}
-
-async function markAtt(status) {
-  document.querySelectorAll('.att-btn, .change-btn').forEach(b => b.disabled = true);
-  try {
-    const res = await api({action: 'markAttendance', token: userToken, status});
-    if (res.success) {
-      todayStatus = res.status;
-      document.getElementById('attendanceSection').innerHTML = buildMarkedHtml(res.status, res.mealType);
-      toast(res.message, 'success');
-      if (res.status === 'absent') document.getElementById('ratingSection').innerHTML = '';
-      else if (res.status === 'present' && currentMenu) renderRatingSection(currentMenu);
-      loadSuggestions();
-    } else if (res.alreadyMarked) {
-      todayStatus = res.status;
-      document.getElementById('attendanceSection').innerHTML = buildMarkedHtml(res.status, res.mealType);
-      if (res.locked) toast(res.message, 'error');
-    } else if (res.message?.includes('session')) {
-      doLogout();
-    } else {
-      toast(res.message || 'Error', 'error');
-      document.querySelectorAll('.att-btn').forEach(b => b.disabled = false);
+  const wSh=ss.getSheetByName('WeeklyMenu');
+  if (wSh) {
+    const dow=new Date(date+'T00:00:00').getDay();
+    const wd=wSh.getDataRange().getValues();
+    for (let i=1;i<wd.length;i++) if (Number(wd[i][0])===dow) {
+      let sd=[]; try{sd=JSON.parse(wd[i][4]||'[]');}catch(e){}
+      const isVegMain=wd[i][2]===true||wd[i][2]==='TRUE';
+      return {success:true,menu:{date,mainCourse:wd[i][1],mainCourseIsVeg:isVegMain,mainCourseImg:wd[i][3],sideDishes:sd,isPureVeg:isVegMain&&sd.every(s=>s.isVeg!==false),fromWeekly:true},date};
     }
-  } catch(e) {
-    toast('Network error. Try again.', 'error');
-    document.querySelectorAll('.att-btn').forEach(b => b.disabled = false);
   }
+  return {success:true,menu:null,date};
+}
+function setMenu(ss,p) {
+  const sh=getOrCreateSheet(ss,'Menu',['Date','MainCourse','MainCourseImg','SideDishes','SetBy','MainCourseIsVeg','SetAt']);
+  const date=p.date||todayIST(); const mc=(p.mainCourse||'').trim(); const mi=(p.mainCourseImg||'').trim();
+  const isVegMain=(p.mainCourseIsVeg==='false'||p.mainCourseIsVeg===false)?false:true;
+  let sd=[]; try{sd=JSON.parse(p.sideDishes||'[]');}catch(e){}
+  if (!mc) return {success:false,message:'Main course required'};
+  const sdj=JSON.stringify(sd); const now=new Date().toISOString(); const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) if (toDateStr(d[i][0])===date) {
+    sh.getRange(i+1,1,1,7).setValues([[date,mc,mi,sdj,'Manager',isVegMain,now]]);
+    return {success:true,message:'Menu updated for '+date,mainCourse:mc,sideDishes:sd,date};
+  }
+  sh.appendRow([date,mc,mi,sdj,'Manager',isVegMain,now]);
+  return {success:true,message:'Menu set for '+date,mainCourse:mc,sideDishes:sd,date};
+}
+function getWeeklyMenu(ss) {
+  const sh=getOrCreateSheet(ss,'WeeklyMenu',['DayOfWeek','MainCourse','MainCourseIsVeg','MainCourseImg','SideDishes','UpdatedAt']);
+  const d=sh.getDataRange().getValues(); const days={};
+  for (let i=1;i<d.length;i++) if (d[i][0]!=='') {
+    let sd=[]; try{sd=JSON.parse(d[i][4]||'[]');}catch(e){}
+    const dow=Number(d[i][0]);
+    days[dow]={dayOfWeek:dow,mainCourse:d[i][1],mainCourseIsVeg:d[i][2]===true||d[i][2]==='TRUE',mainCourseImg:d[i][3],sideDishes:sd,updatedAt:d[i][5]};
+  }
+  return {success:true,days};
+}
+function setWeeklyMenu(ss,p) {
+  const sh=getOrCreateSheet(ss,'WeeklyMenu',['DayOfWeek','MainCourse','MainCourseIsVeg','MainCourseImg','SideDishes','UpdatedAt']);
+  const dow=parseInt(p.dayOfWeek); if (isNaN(dow)||dow<0||dow>6) return {success:false,message:'Invalid day'};
+  const mc=(p.mainCourse||'').trim(); const mi=(p.mainCourseImg||'').trim();
+  const isVegMain=(p.mainCourseIsVeg==='false'||p.mainCourseIsVeg===false)?false:true;
+  let sd=[]; try{sd=JSON.parse(p.sideDishes||'[]');}catch(e){}
+  if (!mc) return {success:false,message:'Main course required'};
+  const sdj=JSON.stringify(sd); const now=new Date().toISOString(); const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) if (Number(d[i][0])===dow) {
+    sh.getRange(i+1,1,1,6).setValues([[dow,mc,isVegMain,mi,sdj,now]]); return {success:true,message:'Weekly menu updated'};
+  }
+  sh.appendRow([dow,mc,isVegMain,mi,sdj,now]);
+  return {success:true,message:'Weekly menu set'};
+}
+
+// ── ATTENDANCE ────────────────────────────────────────────────
+
+function markAttendance(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret);
+  if (!user) return {success:false,message:'Invalid session. Please login again.'};
+  const status=p.status==='present'?'present':'absent';
+  const mealType=p.mealType==='nonveg'?'nonveg':'veg';
+  const today=todayIST();
+  const sh=getOrCreateSheet(ss,'Attendance',['Date','UserID','Username','Name','Status','MealType','MarkedAt','MarkedBy']);
+  const d=sh.getDataRange().getValues();
+  for (let i=1;i<d.length;i++) {
+    const r=parseAttRow(d[i]);
+    if (r.date===today&&r.userId===user.id) {
+      if (r.status==='present') return {success:false,alreadyMarked:true,status:'present',locked:true,message:'You have already opted in. Cannot opt out after confirming.'};
+      if (r.status==='absent'&&status==='present') {
+        sh.getRange(i+1,5).setValue('present'); sh.getRange(i+1,6).setValue(mealType);
+        sh.getRange(i+1,7).setValue(new Date().toISOString()); sh.getRange(i+1,8).setValue('user');
+        return {success:true,status:'present',mealType,changed:true,message:'Changed to Present! Enjoy your meal 🍽️'};
+      }
+      return {success:false,alreadyMarked:true,status:r.status,message:'Already marked as '+r.status};
+    }
+  }
+  sh.appendRow([today,user.id,user.username,user.name,status,mealType,new Date().toISOString(),'user']);
+  return {success:true,status,mealType,message:'Marked as '+status+'!'};
+}
+function adminMarkAttendance(ss,p) {
+  const userId=(p.userId||'').trim(); const username=(p.username||'').trim();
+  const date=p.date||todayIST();
+  const status=p.status==='present'?'present':'absent';
+  const mealType=p.mealType==='nonveg'?'nonveg':'veg';
+  if (!userId) return {success:false,message:'User required'};
+  let userName=username;
+  const uSh=ss.getSheetByName('Users');
+  if (uSh){const ud=uSh.getDataRange().getValues();for(let i=1;i<ud.length;i++)if(String(ud[i][0])===userId){userName=String(ud[i][2]);break;}}
+  const sh=getOrCreateSheet(ss,'Attendance',['Date','UserID','Username','Name','Status','MealType','MarkedAt','MarkedBy']);
+  const d=sh.getDataRange().getValues(); const now=new Date().toISOString();
+  for (let i=1;i<d.length;i++) {
+    const r=parseAttRow(d[i]);
+    if (r.date===date&&r.userId===userId) {
+      sh.getRange(i+1,5).setValue(status); sh.getRange(i+1,6).setValue(mealType);
+      sh.getRange(i+1,7).setValue(now); sh.getRange(i+1,8).setValue('admin');
+      return {success:true,message:'Attendance updated by admin'};
+    }
+  }
+  sh.appendRow([date,userId,username,userName,status,mealType,now,'admin']);
+  return {success:true,message:'Attendance marked by admin'};
+}
+function checkAttendance(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const sh=ss.getSheetByName('Attendance'); if (!sh) return {success:true,marked:false};
+  const d=sh.getDataRange().getValues(); const today=todayIST();
+  for (let i=1;i<d.length;i++) {
+    const r=parseAttRow(d[i]);
+    if (r.date===today&&r.userId===user.id) return {success:true,marked:true,status:r.status,mealType:r.mealType};
+  }
+  return {success:true,marked:false};
+}
+function getMyAttendance(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const sh=ss.getSheetByName('Attendance'); if (!sh) return {success:true,records:[]};
+  const d=sh.getDataRange().getValues(); const rec=[];
+  for (let i=1;i<d.length;i++){const r=parseAttRow(d[i]);if(r.userId===user.id)rec.push({date:r.date,status:r.status,mealType:r.mealType,markedAt:r.markedAt});}
+  rec.sort((a,b)=>b.date.localeCompare(a.date));
+  return {success:true,records:rec.slice(0,60)};
+}
+function getAttendanceSummary(ss,p) {
+  const date=p.date||todayIST(); const sh=ss.getSheetByName('Attendance');
+  if (!sh) return {success:true,records:[],presentCount:0,absentCount:0,vegCount:0,nonVegCount:0,date};
+  const d=sh.getDataRange().getValues(); const rec=[]; let pc=0,ac=0,vc=0,nvc=0;
+  for (let i=1;i<d.length;i++) if (toDateStr(d[i][0])===date) {
+    const r=parseAttRow(d[i]);
+    rec.push({username:r.username,name:r.name,status:r.status,mealType:r.mealType,markedAt:r.markedAt,markedBy:r.markedBy});
+    if (r.status==='present'){pc++;r.mealType==='nonveg'?nvc++:vc++;}else ac++;
+  }
+  return {success:true,records:rec,presentCount:pc,absentCount:ac,vegCount:vc,nonVegCount:nvc,date};
+}
+function getMonthlyData(ss,p) {
+  const f=p.fromDate||(todayIST().slice(0,7)+'-01'); const t=p.toDate||(todayIST().slice(0,7)+'-31');
+  const sh=ss.getSheetByName('Attendance'); if (!sh) return {success:true,records:[],fromDate:f,toDate:t};
+  const d=sh.getDataRange().getValues(); const rec=[];
+  for (let i=1;i<d.length;i++){const r=parseAttRow(d[i]);if(r.date>=f&&r.date<=t)rec.push({date:r.date,username:r.username,name:r.name,status:r.status,mealType:r.mealType,markedAt:r.markedAt});}
+  rec.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));
+  return {success:true,records:rec,fromDate:f,toDate:t};
+}
+function getMonthlyReport(ss,p) {
+  const f=p.fromDate||(todayIST().slice(0,7)+'-01'); const t=p.toDate||(todayIST().slice(0,7)+'-31');
+  const sh=ss.getSheetByName('Attendance'); if (!sh) return {success:true,summary:[],fromDate:f,toDate:t};
+  const d=sh.getDataRange().getValues(); const m={};
+  for (let i=1;i<d.length;i++){
+    const r=parseAttRow(d[i]);
+    if(r.date>=f&&r.date<=t){
+      const k=r.userId;if(!m[k])m[k]={username:r.username,name:r.name,present:0,absent:0,vegMeals:0,nonVegMeals:0};
+      if(r.status==='present'){m[k].present++;r.mealType==='nonveg'?m[k].nonVegMeals++:m[k].vegMeals++;}else m[k].absent++;
+    }
+  }
+  const summary=Object.values(m).map(u=>({name:u.name,username:u.username,presentDays:u.present,absentDays:u.absent,totalDays:u.present+u.absent,vegMeals:u.vegMeals,nonVegMeals:u.nonVegMeals}));
+  summary.sort((a,b)=>a.name.localeCompare(b.name));
+  return {success:true,summary,fromDate:f,toDate:t};
+}
+
+// ── STATS ─────────────────────────────────────────────────────
+
+function getStats(ss) {
+  const today=todayIST();
+  const uSh=ss.getSheetByName('Users'); const aSh=ss.getSheetByName('Attendance'); const rSh=ss.getSheetByName('Ratings');
+  const totalUsers=uSh?Math.max(0,uSh.getLastRow()-1):0;
+  let p=0,ab=0,rat=0,pveg=0,pnveg=0;
+  if(aSh){const d=aSh.getDataRange().getValues();for(let i=1;i<d.length;i++)if(toDateStr(d[i][0])===today){const r=parseAttRow(d[i]);if(r.status==='present'){p++;r.mealType==='nonveg'?pnveg++:pveg++;}else ab++;}}
+  if(rSh){const d=rSh.getDataRange().getValues();const s=new Set();for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===today)s.add(d[i][4]);rat=s.size;}
+  return {success:true,totalUsers,todayPresent:p,todayAbsent:ab,todayTotal:p+ab,todayRatings:rat,todayVeg:pveg,todayNonVeg:pnveg,menu:getMenu(ss,{date:today}).menu,today};
+}
+
+// ── RATINGS ───────────────────────────────────────────────────
+
+function submitRating(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const date=p.date||todayIST(); const itemName=(p.itemName||'').trim();
+  const rating=Math.min(5,Math.max(1,parseInt(p.rating)||0));
+  const comment=(p.comment||'').trim().substring(0,500);
+  if (!itemName||!rating) return {success:false,message:'Item and rating required'};
+  const sh=getOrCreateSheet(ss,'Ratings',['ID','Date','ItemName','ItemType','UserID','Username','Name','Rating','Comment','RatedAt']);
+  const d=sh.getDataRange().getValues(); const now=new Date().toISOString();
+  for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===date&&d[i][4]===user.id&&String(d[i][2])===itemName){sh.getRange(i+1,8,1,3).setValues([[rating,comment,now]]);return{success:true,message:'Rating updated!'};}
+  sh.appendRow(['R'+Date.now(),date,itemName,p.itemType||'main',user.id,user.username,user.name,rating,comment,now]);
+  return {success:true,message:'Thank you!'};
+}
+function getMyRatings(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const sh=ss.getSheetByName('Ratings'); if (!sh) return {success:true,ratings:{}};
+  const d=sh.getDataRange().getValues(); const date=p.date||todayIST(); const r={};
+  for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===date&&d[i][4]===user.id)r[d[i][2]]={rating:d[i][7],comment:d[i][8]};
+  return {success:true,ratings:r};
+}
+function getRatings(ss,p) {
+  const date=p.date||todayIST(); const sh=ss.getSheetByName('Ratings');
+  if (!sh) return {success:true,items:[],date};
+  const d=sh.getDataRange().getValues(); const m={};
+  for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===date){
+    const k=String(d[i][2]);if(!m[k])m[k]={name:k,type:d[i][3],ratings:[],comments:[]};
+    const r=parseInt(d[i][7])||0;if(r)m[k].ratings.push(r);
+    if(d[i][8])m[k].comments.push({username:d[i][5],name:d[i][6],comment:d[i][8],rating:d[i][7]});
+  }
+  return {success:true,items:Object.values(m).map(it=>({name:it.name,type:it.type,avgRating:it.ratings.length?(it.ratings.reduce((a,b)=>a+b,0)/it.ratings.length).toFixed(1):'—',totalRatings:it.ratings.length,comments:it.comments})),date};
+}
+function getCumulativeRatings(ss) {
+  const sh=ss.getSheetByName('Ratings'); if (!sh) return {success:true,ratings:{}};
+  const d=sh.getDataRange().getValues(); const m={};
+  for(let i=1;i<d.length;i++){const name=String(d[i][2]);const r=parseInt(d[i][7])||0;if(!r||!name)continue;if(!m[name])m[name]={sum:0,count:0};m[name].sum+=r;m[name].count++;}
+  const ratings={};
+  Object.entries(m).forEach(([n,v])=>ratings[n]={avg:(v.sum/v.count).toFixed(1),count:v.count});
+  return {success:true,ratings};
+}
+
+// ── IMAGES ────────────────────────────────────────────────────
+
+function getImages(ss) {
+  const sh=ss.getSheetByName('Images'); if (!sh) return {success:true,images:[]};
+  const d=sh.getDataRange().getValues(); const imgs=[];
+  for(let i=1;i<d.length;i++)if(d[i][0])imgs.push({id:d[i][0],name:d[i][1],url:d[i][2],addedAt:d[i][3]});
+  return {success:true,images:imgs};
+}
+function addImage(ss,p) {
+  const name=(p.name||'').trim(); const url=(p.url||'').trim();
+  if (!name||!url) return {success:false,message:'Name and URL required'};
+  const sh=getOrCreateSheet(ss,'Images',['ID','Name','URL','AddedAt']); const id='IMG_'+Date.now();
+  sh.appendRow([id,name,url,new Date().toISOString()]);
+  return {success:true,image:{id,name,url},message:'Image added!'};
+}
+function deleteImage(ss,p) {
+  const sh=ss.getSheetByName('Images'); if (!sh) return {success:false,message:'Not found'};
+  const d=sh.getDataRange().getValues();
+  for(let i=1;i<d.length;i++)if(d[i][0]===p.id){sh.deleteRow(i+1);return{success:true};}
+  return {success:false,message:'Image not found'};
+}
+
+// ── SUGGESTIONS ───────────────────────────────────────────────
+
+function getSuggestions(ss) {
+  const sh=getOrCreateSheet(ss,'Suggestions',['ID','ItemName','ItemType','SuggestedBy','SuggestedByUsername','SuggestedAt','UpVoters','DownVoters']);
+  const d=sh.getDataRange().getValues(); const items=[];
+  for(let i=1;i<d.length;i++){
+    if(!d[i][0])continue;
+    let up=[],dn=[];
+    try{up=JSON.parse(d[i][6]||'[]');}catch(e){}
+    try{dn=JSON.parse(d[i][7]||'[]');}catch(e){}
+    items.push({id:String(d[i][0]),name:String(d[i][1]),type:String(d[i][2]),suggestedBy:String(d[i][3]),suggestedByUsername:String(d[i][4]),suggestedAt:d[i][5],upVotes:up.length,downVotes:dn.length,upVoters:up,downVoters:dn});
+  }
+  items.sort((a,b)=>(b.upVotes-b.downVotes)-(a.upVotes-a.downVotes)||String(b.suggestedAt).localeCompare(String(a.suggestedAt)));
+  return {success:true,items};
+}
+function submitSuggestion(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const name=(p.name||'').trim(); const type=p.type==='side'?'side':'main';
+  if (!name||name.length<2) return {success:false,message:'Enter a dish name (min 2 chars)'};
+  const sh=getOrCreateSheet(ss,'Suggestions',['ID','ItemName','ItemType','SuggestedBy','SuggestedByUsername','SuggestedAt','UpVoters','DownVoters']);
+  const d=sh.getDataRange().getValues();
+  for(let i=1;i<d.length;i++)if(String(d[i][1]).toLowerCase()===name.toLowerCase()&&d[i][2]===type)return{success:false,message:'"'+name+'" has already been suggested.'};
+  const id='SG_'+Date.now();
+  sh.appendRow([id,name,type,user.name,user.username,new Date().toISOString(),'[]','[]']);
+  return {success:true,message:'Suggestion added!',id,name,type};
+}
+function voteSuggestion(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret); if (!user) return {success:false,message:'Invalid session'};
+  const vote=p.vote; const sh=ss.getSheetByName('Suggestions'); if (!sh) return {success:false,message:'No suggestions'};
+  const d=sh.getDataRange().getValues();
+  for(let i=1;i<d.length;i++){
+    if(String(d[i][0])!==String(p.id))continue;
+    let up=[],dn=[];
+    try{up=JSON.parse(d[i][6]||'[]');}catch(e){}
+    try{dn=JSON.parse(d[i][7]||'[]');}catch(e){}
+    up=up.filter(x=>x!==user.id); dn=dn.filter(x=>x!==user.id);
+    if(vote==='up')up.push(user.id);if(vote==='down')dn.push(user.id);
+    sh.getRange(i+1,7,1,2).setValues([[JSON.stringify(up),JSON.stringify(dn)]]);
+    return {success:true,upVotes:up.length,downVotes:dn.length};
+  }
+  return {success:false,message:'Suggestion not found'};
+}
+function deleteSuggestion(ss,p) {
+  const sh=ss.getSheetByName('Suggestions'); if (!sh) return {success:false};
+  const d=sh.getDataRange().getValues();
+  for(let i=1;i<d.length;i++)if(String(d[i][0])===String(p.id)){sh.deleteRow(i+1);return{success:true};}
+  return {success:false,message:'Not found'};
 }
 
 // ══════════════════════════════════════════════════════════════
-//  RATINGS
+//  TEA ATTENDANCE
+//  TeaAttendance: [ID, Date, UserID, Username, Name, Session, TeaType, RecordedAt]
+//  Session : 'morning' | 'evening'
+//  TeaType : 'tea' | 'black' | 'none'
 // ══════════════════════════════════════════════════════════════
 
-function renderRatingSection(menu) {
-  if (!menu) return;
-  const items = [
-    {name: menu.mainCourse, type: 'main'},
-    ...(menu.sideDishes || []).map(d => ({name: d.name, type: 'side'}))
-  ].filter(i => i.name);
+// ── PRIMARY: Save ALL users in ONE single API call ────────────
+// Payload format: "userId:morning:evening|userId:morning:evening|..."
+// Only ASCII user IDs — no Malayalam, no JSON, shortest possible URL
+function setTeaAllUsers(ss, p) {
+  const date    = p.date    || todayIST();
+  const payload = (p.payload || '').trim();
+  if (!payload) return {success:false, message:'No data'};
 
-  const itemsHtml = items.map((item, idx) => {
-    const ex = userRatings[item.name];
-    const tl = item.type === 'main' ? 'Main Course' : 'Side Dish';
-    const ratedHtml = ex
-      ? `<div class="rated-badge"><i class="fa-solid fa-check"></i> Rated ${ex.rating}★</div>`
-      : '';
-    const starsHtml = [1,2,3,4,5].map(s =>
-      `<span class="star ${ex && ex.rating >= s ? 'active' : ''}"
-             onclick="setRating('${escA(item.name)}',${s})"
-             id="star-${idx}-${s}">★</span>`).join('');
-    const cVal = ex ? esc(ex.comment || '') : '';
-    return `<div class="rating-item">
-      <div class="rating-item-name">${esc(item.name)}<span class="rating-item-type-badge">${tl}</span></div>
-      ${ratedHtml}
-      <div class="star-row" id="stars-${idx}">${starsHtml}</div>
-      <textarea class="rating-comment" id="comment-${idx}"
-        placeholder="Comment in Malayalam or English… (ഇവിടെ ടൈപ്പ് ചെയ്യാം)"
-        rows="2" lang="ml">${cVal}</textarea>
-      <div class="comment-hint">മലയാളത്തിൽ കമന്റ് ചെയ്യാം</div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('ratingSection').innerHTML = `
-    <div class="rating-card">
-      <div class="rating-card-header">
-        <i class="fa-solid fa-star"></i><h3>Rate Today's Menu</h3>
-      </div>
-      ${itemsHtml}
-      <div class="rating-submit-row">
-        <button class="btn-submit-rating" id="ratingSubmitBtn" onclick="submitAllRatings()">
-          <i class="fa-solid fa-paper-plane"></i> Submit Ratings
-        </button>
-      </div>
-    </div>`;
-
-  items.forEach(item => {
-    const ex = userRatings[item.name];
-    if (ex) pendingRatings[item.name] = {...ex, type: item.type};
+  // Parse: {userId: {morning, evening}}
+  const incoming = {};
+  payload.split('|').forEach(chunk => {
+    const parts = chunk.split(':');
+    if (parts.length === 3) {
+      incoming[parts[0]] = {morning: parts[1], evening: parts[2]};
+    }
   });
-}
+  if (!Object.keys(incoming).length) return {success:false, message:'Invalid payload'};
 
-function setRating(name, rating) {
-  const items = currentMenu
-    ? [{name: currentMenu.mainCourse, type: 'main'},
-       ...(currentMenu.sideDishes || []).map(d => ({name: d.name, type: 'side'}))]
-       .filter(i => i.name)
-    : [];
-  const idx = items.findIndex(i => i.name === name);
-  if (idx < 0) return;
-  if (!pendingRatings[name]) pendingRatings[name] = {type: items[idx].type};
-  pendingRatings[name].rating = rating;
-  for (let s = 1; s <= 5; s++) {
-    const el = document.getElementById(`star-${idx}-${s}`);
-    if (el) el.className = 'star' + (s <= rating ? ' active' : '');
-  }
-}
-
-async function submitAllRatings() {
-  const items = currentMenu
-    ? [{name: currentMenu.mainCourse, type: 'main'},
-       ...(currentMenu.sideDishes || []).map(d => ({name: d.name, type: 'side'}))]
-       .filter(i => i.name)
-    : [];
-  const toSubmit = [];
-  items.forEach((item, idx) => {
-    const p       = pendingRatings[item.name];
-    const comment = document.getElementById(`comment-${idx}`)?.value?.trim() || '';
-    if (p && p.rating) toSubmit.push({itemName: item.name, itemType: item.type, rating: p.rating, comment});
-  });
-  if (!toSubmit.length) { toast('Please select a star rating first', 'error'); return; }
-  const btn = document.getElementById('ratingSubmitBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span> Submitting…';
-  try {
-    for (const r of toSubmit) await api({action: 'submitRating', token: userToken, ...r});
-    toast(`${toSubmit.length} rating${toSubmit.length > 1 ? 's' : ''} submitted! 🙏`, 'success');
-    const ratRes = await api({action: 'getMyRatings', token: userToken});
-    userRatings = ratRes.ratings || {};
-    renderRatingSection(currentMenu);
-  } catch(e) { toast('Could not submit. Try again.', 'error'); }
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Ratings';
-}
-
-// ══════════════════════════════════════════════════════════════
-//  SUGGESTIONS
-// ══════════════════════════════════════════════════════════════
-
-async function loadSuggestions() {
-  const sec = document.getElementById('suggestionSection');
-  if (!sec) return;
-  try {
-    const res = await api({action: 'getSuggestions'});
-    renderSuggestions(res.items || []);
-  } catch(e) { renderSuggestions([]); }
-}
-
-function renderSuggestions(items) {
-  const sec = document.getElementById('suggestionSection');
-  if (!sec) return;
-  const listHtml = items.length
-    ? items.map(s => {
-        const myUp  = s.upVoters.includes(userData?.id || '__');
-        const myDn  = s.downVoters.includes(userData?.id || '__');
-        const net   = s.upVotes - s.downVotes;
-        const netCls = net > 0 ? 'sug-net-pos' : net < 0 ? 'sug-net-neg' : 'sug-net-zero';
-        const netStr = net > 0 ? '+' + net : String(net);
-        return `<div class="sug-item" id="sugitem-${esc(s.id)}">
-          <span class="sug-type-dot sug-type-${esc(s.type)}"></span>
-          <div class="sug-info">
-            <div class="sug-name">${esc(s.name)}</div>
-            <div class="sug-meta">${s.type === 'main' ? 'Main' : 'Side'} · by ${esc(s.suggestedBy)}</div>
-          </div>
-          <div class="sug-vote-row">
-            <span class="sug-net ${netCls}">${netStr}</span>
-            <button class="vote-btn ${myUp ? 'voted-up' : ''}" onclick="vote('${esc(s.id)}','${myUp ? 'remove' : 'up'}')" title="👍">👍</button>
-            <span class="vote-count">${s.upVotes}</span>
-            <button class="vote-btn ${myDn ? 'voted-down' : ''}" onclick="vote('${esc(s.id)}','${myDn ? 'remove' : 'down'}')" title="👎">👎</button>
-            <span class="vote-count">${s.downVotes}</span>
-          </div>
-        </div>`;
-      }).join('')
-    : `<div class="sug-empty">
-        <i class="fa-solid fa-lightbulb" style="opacity:.3;display:block;font-size:1.5rem;margin-bottom:.38rem"></i>
-        No suggestions yet. Be the first!
-       </div>`;
-
-  sec.innerHTML = `
-    <div class="sug-card">
-      <div class="sug-card-header">
-        <h3><i class="fa-solid fa-lightbulb"></i> Dish Suggestions</h3>
-        <span style="font-size:.68rem;opacity:.7">${items.length} idea${items.length !== 1 ? 's' : ''}</span>
-      </div>
-      <div class="sug-add-row">
-        <input type="text" id="sugInput" class="ml"
-               placeholder="Suggest a dish… (Malayalam / English)" lang="ml"
-               onkeydown="if(event.key==='Enter')submitSuggestion()">
-        <select id="sugType"><option value="main">Main</option><option value="side">Side</option></select>
-        <button class="sug-add-btn" onclick="submitSuggestion()">
-          <i class="fa-solid fa-paper-plane"></i> Suggest
-        </button>
-      </div>
-      <div class="sug-list">${listHtml}</div>
-    </div>`;
-}
-
-async function submitSuggestion() {
-  const name = document.getElementById('sugInput')?.value.trim();
-  const type = document.getElementById('sugType')?.value || 'main';
-  if (!name) { toast('Enter a dish name', 'error'); return; }
-  const btn = document.querySelector('.sug-add-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner" style="width:13px;height:13px;border-width:2px"></span>'; }
-  try {
-    const res = await api({action: 'submitSuggestion', token: userToken, name, type});
-    if (res.success) { toast(res.message, 'success'); loadSuggestions(); }
-    else toast(res.message, 'error');
-  } catch(e) { toast('Network error', 'error'); }
-  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Suggest'; }
-}
-
-async function vote(id, voteType) {
-  try {
-    const res = await api({action: 'voteSuggestion', token: userToken, id, vote: voteType});
-    if (res.success) loadSuggestions();
-    else if (res.message?.includes('session')) doLogout();
-    else toast(res.message, 'error');
-  } catch(e) { toast('Network error', 'error'); }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  HISTORY
-// ══════════════════════════════════════════════════════════════
-
-async function toggleHistory() {
-  historyOpen = !historyOpen;
-  const panel = document.getElementById('historyPanel');
-  panel.style.display = historyOpen ? 'block' : 'none';
-  if (!historyOpen) return;
-  panel.innerHTML = `
-    <div class="history-panel">
-      <div class="history-header"><i class="fa-solid fa-clock-rotate-left"></i> My Attendance</div>
-      <div id="historyList" style="text-align:center;padding:1.4rem"><span class="spinner"></span></div>
-    </div>`;
-  try {
-    const res = await api({action: 'getMyAttendance', token: userToken});
-    const list = document.getElementById('historyList');
-    if (!res.records || !res.records.length) {
-      list.innerHTML = '<div style="padding:1rem;color:var(--muted);font-size:.83rem">No records yet.</div>';
-      return;
+  // Build name/username lookup from Users sheet (done once)
+  const nameMap = {}, usernameMap = {};
+  const uSh = ss.getSheetByName('Users');
+  if (uSh) {
+    const ud = uSh.getDataRange().getValues();
+    for (let i = 1; i < ud.length; i++) {
+      nameMap[String(ud[i][0])]     = String(ud[i][2]); // id → name
+      usernameMap[String(ud[i][0])] = String(ud[i][1]); // id → username
     }
-    list.innerHTML = res.records.map(r => {
-      const d = new Date(r.date + 'T00:00:00');
-      const mealBadge = r.status === 'present'
-        ? (r.mealType === 'nonveg'
-            ? '<span class="badge" style="background:#fee2e2;color:#991b1b">🍗 Non-Veg</span>'
-            : '<span class="badge badge-present">🥦 Veg</span>')
-        : '';
-      return `<div class="history-item">
-        <div>
-          <div class="hi-date">${d.toLocaleDateString('en-IN', {day: 'numeric', month: 'short'})}</div>
-          <div class="hi-day">${d.toLocaleDateString('en-IN', {weekday: 'short', year: 'numeric'})}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${mealBadge}
-          <span class="badge badge-${r.status}">${r.status === 'present' ? '✓ Present' : '✗ Absent'}</span>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    document.getElementById('historyList').innerHTML = '<div style="padding:1rem;color:var(--muted)">Could not load.</div>';
   }
-}
-</script>
 
-<div style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:.5rem 1rem;font-size:.65rem;color:rgba(255,255,255,.4);background:rgba(0,0,0,.18);backdrop-filter:blur(6px);z-index:599;letter-spacing:.03em;pointer-events:none">
-  Developed by <strong style="color:rgba(255,255,255,.6)">CPATSBI IT Team</strong> &nbsp;·&nbsp; Dedicated to <strong style="color:rgba(255,255,255,.6)">RBO</strong> with <span style="color:#f87171">❤️</span>
-</div>
-</body>
-</html>
+  const sh  = getOrCreateSheet(ss, 'TeaAttendance',
+    ['ID','Date','UserID','Username','Name','Session','TeaType','RecordedAt']);
+  const d   = sh.getDataRange().getValues();
+  const now = new Date().toISOString();
+
+  // Build lookup of existing rows for this date: userId_session → rowIndex (1-based)
+  const existingMap = {};
+  for (let i = 1; i < d.length; i++) {
+    if (toDateStr(d[i][1]) === date) {
+      existingMap[String(d[i][2]) + '_' + String(d[i][5])] = i;
+    }
+  }
+
+  // Upsert each user's morning + evening in one pass
+  Object.entries(incoming).forEach(([uid, sessions]) => {
+    const uname = usernameMap[uid] || uid;
+    const uname_ = nameMap[uid]   || uid;
+    ['morning', 'evening'].forEach(session => {
+      const teaType = sessions[session] || 'none';
+      const key = uid + '_' + session;
+      if (existingMap[key] !== undefined) {
+        sh.getRange(existingMap[key] + 1, 7, 1, 2).setValues([[teaType, now]]);
+      } else {
+        sh.appendRow(['TA_' + Date.now() + '_' + uid.slice(-4) + '_' + session[0],
+                      date, uid, uname, uname_, session, teaType, now]);
+      }
+    });
+  });
+
+  return {success:true, saved: Object.keys(incoming).length};
+}
+
+// ── Both sessions for one user (kept for compat) ─────────────
+function setTeaBothSessions(ss, p) {
+  const date    = p.date     || todayIST();
+  const userId  = (p.userId   || '').trim();
+  const username= (p.username || '').trim();
+  const morning = p.morning  || 'none';
+  const evening = p.evening  || 'none';
+  if (!userId) return {success:false, message:'userId required'};
+  let name = username;
+  const uSh = ss.getSheetByName('Users');
+  if (uSh){const ud=uSh.getDataRange().getValues();for(let i=1;i<ud.length;i++)if(String(ud[i][0])===userId){name=String(ud[i][2]);break;}}
+  const sh  = getOrCreateSheet(ss,'TeaAttendance',['ID','Date','UserID','Username','Name','Session','TeaType','RecordedAt']);
+  const d   = sh.getDataRange().getValues();
+  const now = new Date().toISOString();
+  const sessions = {morning,evening}; const found = {morning:false,evening:false};
+  for (let i=1;i<d.length;i++) {
+    if (toDateStr(d[i][1])===date && String(d[i][2])===userId) {
+      const s=String(d[i][5]);
+      if(s==='morning'||s==='evening'){sh.getRange(i+1,7,1,2).setValues([[sessions[s],now]]);found[s]=true;}
+    }
+  }
+  if(!found.morning)sh.appendRow(['TA_'+Date.now()+'m',date,userId,username,name,'morning',morning,now]);
+  if(!found.evening)sh.appendRow(['TA_'+Date.now()+'e',date,userId,username,name,'evening',evening,now]);
+  return {success:true};
+}
+
+// ── Single session (kept for compat) ─────────────────────────
+function setTeaRecord(ss, p) {
+  const date    = p.date    || todayIST();
+  const userId  = (p.userId  || '').trim();
+  const username= (p.username|| '').trim();
+  const session = p.session || 'morning';
+  const teaType = p.teaType || 'none';
+  if (!userId) return {success:false,message:'userId required'};
+  let name = username;
+  const uSh=ss.getSheetByName('Users');
+  if(uSh){const ud=uSh.getDataRange().getValues();for(let i=1;i<ud.length;i++)if(String(ud[i][0])===userId){name=String(ud[i][2]);break;}}
+  const sh=getOrCreateSheet(ss,'TeaAttendance',['ID','Date','UserID','Username','Name','Session','TeaType','RecordedAt']);
+  const d=sh.getDataRange().getValues(); const now=new Date().toISOString();
+  for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===date&&String(d[i][2])===userId&&String(d[i][5])===session){sh.getRange(i+1,7,1,2).setValues([[teaType,now]]);return{success:true,updated:true};}
+  sh.appendRow(['TA_'+Date.now(),date,userId,username,name,session,teaType,now]);
+  return {success:true,inserted:true};
+}
+
+// ── Bulk save (kept for compat) ───────────────────────────────
+function setTeaAttendance(ss, p) {
+  const date=p.date||todayIST();
+  let records=[];
+  try{records=JSON.parse(p.records||'[]');}catch(e){return{success:false,message:'Invalid records'};}
+  const sh=getOrCreateSheet(ss,'TeaAttendance',['ID','Date','UserID','Username','Name','Session','TeaType','RecordedAt']);
+  const d=sh.getDataRange().getValues(); const now=new Date().toISOString();
+  const existingMap={};
+  for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===date)existingMap[String(d[i][2])+'_'+String(d[i][5])]=i;
+  records.forEach(r=>{
+    const key=String(r.userId)+'_'+String(r.session);
+    if(existingMap[key]!==undefined){sh.getRange(existingMap[key]+1,7,1,2).setValues([[r.teaType,now]]);}
+    else{sh.appendRow(['TA_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),date,r.userId,r.username,r.name,r.session,r.teaType,now]);Utilities.sleep(30);}
+  });
+  return {success:true,message:'Tea attendance saved for '+date};
+}
+
+function getTeaAttendance(ss, p) {
+  const date=p.date||todayIST();
+  const sh=ss.getSheetByName('TeaAttendance');
+  if(!sh)return{success:true,records:[],date};
+  const d=sh.getDataRange().getValues(); const records=[];
+  for(let i=1;i<d.length;i++)if(toDateStr(d[i][1])===date&&String(d[i][6])!=='none')records.push(parseTeaRow(d[i]));
+  return {success:true,records,date};
+}
+function getTeaCountForPeriod(ss, p) {
+  const from=p.periodFrom||todayIST(); const to=p.periodTo||todayIST();
+  const sh=ss.getSheetByName('TeaAttendance');
+  if(!sh)return{success:true,teaCount:0,blackTeaCount:0,userTea:{}};
+  const d=sh.getDataRange().getValues();
+  let teaCount=0,blackTeaCount=0; const userTea={};
+  for(let i=1;i<d.length;i++){
+    const row=parseTeaRow(d[i]);
+    if(row.date<from||row.date>to)continue;
+    if(row.teaType==='tea'){teaCount++;if(!userTea[row.userId])userTea[row.userId]={teaServings:0,blackTeaServings:0};userTea[row.userId].teaServings++;}
+    else if(row.teaType==='black'){blackTeaCount++;if(!userTea[row.userId])userTea[row.userId]={teaServings:0,blackTeaServings:0};userTea[row.userId].blackTeaServings++;}
+  }
+  return {success:true,teaCount,blackTeaCount,userTea};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  BILLING
+// ══════════════════════════════════════════════════════════════
+
+function addExpense(ss,p) {
+  const sh=getOrCreateSheet(ss,'Expenses',['ID','PeriodKey','PeriodFrom','PeriodTo','Category','Amount','AddedAt']);
+  const from=p.periodFrom; const to=p.periodTo;
+  if(!from||!to)return{success:false,message:'Period required'};
+  const cat=(p.category||'').toLowerCase().replace(/\s+/g,'_');
+  if(!cat)return{success:false,message:'Category required'};
+  const amt=parseFloat(p.amount)||0;if(amt<=0)return{success:false,message:'Amount must be > 0'};
+  const id='EX_'+Date.now();
+  sh.appendRow([id,from+'_'+to,from,to,cat,amt,new Date().toISOString()]);
+  return {success:true,id,message:'Expense added'};
+}
+function getExpenses(ss,p) {
+  const sh=ss.getSheetByName('Expenses');
+  if(!sh)return{success:true,expenses:[],totals:{salary:0,groceries:0,vegetables:0,meat:0,milk:0}};
+  const key=p.periodFrom+'_'+p.periodTo;
+  const d=sh.getDataRange().getValues(); const expenses=[];
+  const totals={salary:0,groceries:0,vegetables:0,meat:0,milk:0};
+  for(let i=1;i<d.length;i++)if(String(d[i][1])===key){
+    const cat=String(d[i][4]);const amt=parseFloat(d[i][5])||0;
+    expenses.push({id:String(d[i][0]),category:cat,amount:amt,addedAt:d[i][6]});
+    if(totals[cat]!==undefined)totals[cat]+=amt;else totals[cat]=(totals[cat]||0)+amt;
+  }
+  return {success:true,expenses,totals};
+}
+function deleteExpense(ss,p) {
+  const sh=ss.getSheetByName('Expenses');if(!sh)return{success:false};
+  const d=sh.getDataRange().getValues();
+  for(let i=1;i<d.length;i++)if(String(d[i][0])===String(p.id)){sh.deleteRow(i+1);return{success:true};}
+  return {success:false,message:'Not found'};
+}
+function calculateBills(ss,p) {
+  const from=p.periodFrom;const to=p.periodTo;
+  if(!from||!to)return{success:false,message:'Period required'};
+  const expRes=getExpenses(ss,{periodFrom:from,periodTo:to});
+  const tot=expRes.totals;
+  const milkPool=tot.milk||0;const meatPool=tot.meat||0;
+  let commonPool=0;
+  Object.entries(tot).forEach(([k,v])=>{if(k!=='meat'&&k!=='milk')commonPool+=(v||0);});
+  const teaRes=getTeaCountForPeriod(ss,{periodFrom:from,periodTo:to});
+  const totalTeaServings=teaRes.teaCount||0;
+  const totalBlackTeaServings=teaRes.blackTeaCount||0;
+  const userTeaMap=teaRes.userTea||{};
+  const totalTeaEquiv=totalTeaServings+(totalBlackTeaServings*0.5);
+  const teaCostPerServing=totalTeaEquiv>0?Math.ceil(milkPool/totalTeaEquiv):0;
+  const blackTeaCostPerServing=teaCostPerServing/2;
+  const attSh=ss.getSheetByName('Attendance');if(!attSh)return{success:false,message:'No attendance data'};
+  const attData=attSh.getDataRange().getValues();
+  let totalMeals=0,totalNonVegMeals=0;const userMap={};
+  const uSh=ss.getSheetByName('Users');const userDietMap={};
+  if(uSh){const ud=uSh.getDataRange().getValues();for(let i=1;i<ud.length;i++){const u=parseUserRow(ud[i]);userDietMap[u.id]=u.dietPref;}}
+  for(let i=1;i<attData.length;i++){
+    const r=parseAttRow(attData[i]);
+    if(r.date<from||r.date>to||r.status!=='present')continue;
+    totalMeals++;if(r.mealType==='nonveg')totalNonVegMeals++;
+    if(!userMap[r.userId])userMap[r.userId]={name:r.name,username:r.username,dietPref:userDietMap[r.userId]||'veg',vegMeals:0,nonVegMeals:0};
+    if(r.mealType==='nonveg')userMap[r.userId].nonVegMeals++;else userMap[r.userId].vegMeals++;
+  }
+  if(totalMeals===0)return{success:false,message:'No attendance data for this period'};
+  const baseCostPerMeal=commonPool/totalMeals;
+  const meatCostPerMeal=totalNonVegMeals>0?meatPool/totalNonVegMeals:0;
+  const billSh=getOrCreateSheet(ss,'Bills',['ID','PeriodKey','PeriodFrom','PeriodTo','UserID','Username','Name','DietPref','DaysPresent','VegMeals','NonVegMeals','BaseCostPerMeal','MeatCostPerMeal','TeaServings','BlackTeaServings','TeaBill','TotalBill','CreatedAt','SeenAt','Archived']);
+  const key=from+'_'+to;const now=new Date().toISOString();
+  const bData=billSh.getDataRange().getValues();
+  for(let i=bData.length-1;i>=1;i--)if(String(bData[i][1])===key&&String(bData[i][19])!=='archived')billSh.deleteRow(i+1);
+  const bills=[];
+  Object.entries(userMap).forEach(([uid,u])=>{
+    const daysPresent=u.vegMeals+u.nonVegMeals;
+    const mealBill=daysPresent*baseCostPerMeal+u.nonVegMeals*meatCostPerMeal;
+    const ut=userTeaMap[uid]||{teaServings:0,blackTeaServings:0};
+    const teaBill=(ut.teaServings*teaCostPerServing)+(ut.blackTeaServings*blackTeaCostPerServing);
+    const totalBill=mealBill+teaBill;
+    const id='BL_'+Date.now()+'_'+uid;
+    billSh.appendRow([id,key,from,to,uid,u.username,u.name,u.dietPref,daysPresent,u.vegMeals,u.nonVegMeals,baseCostPerMeal.toFixed(2),meatCostPerMeal.toFixed(2),ut.teaServings,ut.blackTeaServings,teaBill.toFixed(2),totalBill.toFixed(2),now,'','']);
+    bills.push({id,userId:uid,username:u.username,name:u.name,dietPref:u.dietPref,daysPresent,vegMeals:u.vegMeals,nonVegMeals:u.nonVegMeals,baseCostPerMeal:baseCostPerMeal.toFixed(2),meatCostPerMeal:meatCostPerMeal.toFixed(2),teaServings:ut.teaServings,blackTeaServings:ut.blackTeaServings,teaBill:teaBill.toFixed(2),totalBill:totalBill.toFixed(2)});
+    Utilities.sleep(50);
+  });
+  bills.sort((a,b)=>a.name.localeCompare(b.name));
+  return {success:true,bills,summary:{from,to,totalMeals,totalNonVegMeals,totalTeaServings,totalBlackTeaServings,commonPool:commonPool.toFixed(2),meatPool:meatPool.toFixed(2),milkPool:milkPool.toFixed(2),baseCostPerMeal:baseCostPerMeal.toFixed(2),meatCostPerMeal:meatCostPerMeal.toFixed(2),teaCostPerServing:teaCostPerServing.toFixed(2),blackTeaCostPerServing:blackTeaCostPerServing.toFixed(2),usersCount:bills.length}};
+}
+// ══════════════════════════════════════════════════════════════
+function getUserBills(ss, p, secret) {
+  const user = verifyUserToken(ss, p.token, secret);
+  if (!user) return {success: false, message: 'Invalid session'};
+
+  const sh = ss.getSheetByName('Bills');
+  if (!sh) return {success: true, bills: [], hasNewBill: false};
+
+  const d = sh.getDataRange().getValues();
+  const bills = [];
+
+  for (let i = 1; i < d.length; i++) {
+    if (String(d[i][4]) !== user.id) continue;
+
+    const periodFrom  = toDateStr(d[i][2]);   // column C
+    const periodTo    = toDateStr(d[i][3]);   // column D
+    const createdRaw  = d[i][17];             // column R (CreatedAt)
+    const createdAt   = createdRaw ? new Date(createdRaw) : null;
+    const createdStr  = createdAt  ? createdAt.toISOString() : '';
+    const seenAt      = d[i][18]   ? String(d[i][18]) : '';  // column S
+    const archived    = String(d[i][19] || '') === 'archived'; // column T
+
+    const daysSince = createdAt
+      ? Math.floor((new Date() - createdAt) / (1000 * 60 * 60 * 24))
+      : 999;
+    const isNew = daysSince <= 7 && !seenAt && !archived;
+
+    bills.push({
+      id:               String(d[i][0]),
+      periodFrom:       periodFrom,
+      periodTo:         periodTo,
+      daysPresent:      d[i][8],
+      vegMeals:         d[i][9],
+      nonVegMeals:      d[i][10],
+      baseCostPerMeal:  d[i][11],
+      meatCostPerMeal:  d[i][12],
+      teaServings:      d[i][13] || 0,
+      blackTeaServings: d[i][14] || 0,
+      teaBill:          d[i][15] || 0,
+      totalBill:        d[i][16],
+      createdAt:        createdStr,
+      seenAt:           seenAt,
+      isNew:            isNew,
+      archived:         archived
+    });
+  }
+
+  bills.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+  return {
+    success:    true,
+    bills:      bills,
+    hasNewBill: bills.some(b => b.isNew)
+  };
+}
+function markBillSeen(ss,p,secret) {
+  const user=verifyUserToken(ss,p.token,secret);if(!user)return{success:false};
+  const sh=ss.getSheetByName('Bills');if(!sh)return{success:false};
+  const d=sh.getDataRange().getValues();
+  for(let i=1;i<d.length;i++)if(String(d[i][0])===String(p.id)&&String(d[i][4])===user.id){sh.getRange(i+1,19).setValue(new Date().toISOString());return{success:true};}
+  return {success:false};
+}
+function getAllBillsManager(ss,p) {
+  const key=p.periodFrom+'_'+p.periodTo;
+  const sh=ss.getSheetByName('Bills');if(!sh)return{success:true,bills:[]};
+  const d=sh.getDataRange().getValues();const bills=[];
+  for(let i=1;i<d.length;i++)if(String(d[i][1])===key)
+    bills.push({id:String(d[i][0]),userId:String(d[i][4]),username:String(d[i][5]),name:String(d[i][6]),dietPref:String(d[i][7]),daysPresent:d[i][8],vegMeals:d[i][9],nonVegMeals:d[i][10],baseCostPerMeal:d[i][11],meatCostPerMeal:d[i][12],teaServings:d[i][13]||0,blackTeaServings:d[i][14]||0,teaBill:d[i][15]||0,totalBill:d[i][16],createdAt:d[i][17],archived:d[i][19]==='archived'});
+  bills.sort((a,b)=>a.name.localeCompare(b.name));
+  return {success:true,bills};
+}
+function archiveBillPeriod(ss,p) {
+  const key=p.periodFrom+'_'+p.periodTo;
+  const sh=ss.getSheetByName('Bills');if(!sh)return{success:false};
+  const d=sh.getDataRange().getValues();let count=0;
+  for(let i=1;i<d.length;i++)if(String(d[i][1])===key){sh.getRange(i+1,20).setValue('archived');count++;}
+  return {success:true,message:count+' bills archived'};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ONE-TIME MIGRATION
+//  Apps Script Editor → select runMigration → click ▶ Run
+// ══════════════════════════════════════════════════════════════
+
+function runMigration() {
+  const props    = PropertiesService.getScriptProperties();
+  const SHEET_ID = props.getProperty('SHEET_ID') || '1NlR7zd_eH-pZCCaEyGPtK-cNAbl3es4GTxFVnyacyow';
+  const ss       = SpreadsheetApp.openById(SHEET_ID);
+  const log      = [];
+
+  try {
+    const attSh=ss.getSheetByName('Attendance');
+    if(attSh){
+      const headers=attSh.getRange(1,1,1,attSh.getLastColumn()).getValues()[0];
+      if(!headers.includes('MarkedBy')){
+        attSh.getRange(1,8).setValue('MarkedBy');
+        attSh.getRange(1,8).setFontWeight('bold').setBackground('#2d6a4f').setFontColor('#ffffff');
+        const lastRow=attSh.getLastRow();
+        if(lastRow>1)attSh.getRange(2,8,lastRow-1,1).setValues(Array(lastRow-1).fill(['user']));
+        log.push('✅ Attendance: Added MarkedBy column, filled '+(lastRow-1)+' rows with "user"');
+      }else{log.push('⏭️ Attendance: MarkedBy already exists');}
+    }else{log.push('⏭️ Attendance: Sheet not found');}
+  }catch(e){log.push('❌ Attendance: '+e.toString());}
+
+  try {
+    const billSh=ss.getSheetByName('Bills');
+    if(billSh){
+      const lastCol=billSh.getLastColumn();
+      if(lastCol<20){
+        billSh.setName('Bills_Old');
+        log.push('✅ Bills: Renamed to Bills_Old ('+lastCol+' cols, '+(billSh.getLastRow()-1)+' rows kept)');
+        const newSh=ss.insertSheet('Bills');
+        const hdr=['ID','PeriodKey','PeriodFrom','PeriodTo','UserID','Username','Name','DietPref','DaysPresent','VegMeals','NonVegMeals','BaseCostPerMeal','MeatCostPerMeal','TeaServings','BlackTeaServings','TeaBill','TotalBill','CreatedAt','SeenAt','Archived'];
+        newSh.appendRow(hdr);newSh.setFrozenRows(1);
+        newSh.getRange(1,1,1,hdr.length).setFontWeight('bold').setBackground('#2d6a4f').setFontColor('#ffffff');
+        log.push('✅ Bills: New sheet created with 20 columns');
+      }else{log.push('⏭️ Bills: Already '+lastCol+' columns, skipped');}
+    }else{log.push('⏭️ Bills: No existing sheet, will auto-create on first calculateBills');}
+  }catch(e){log.push('❌ Bills: '+e.toString());}
+
+  try {
+    const expSh=ss.getSheetByName('Expenses');
+    log.push(expSh?'✅ Expenses: '+(expSh.getLastRow()-1)+' records safe':'⏭️ Expenses: Not found, will auto-create');
+  }catch(e){}
+
+  try {
+    const teaSh=ss.getSheetByName('TeaAttendance');
+    if(!teaSh){
+      const newTea=ss.insertSheet('TeaAttendance');
+      const hdr=['ID','Date','UserID','Username','Name','Session','TeaType','RecordedAt'];
+      newTea.appendRow(hdr);newTea.setFrozenRows(1);
+      newTea.getRange(1,1,1,hdr.length).setFontWeight('bold').setBackground('#2d6a4f').setFontColor('#ffffff');
+      log.push('✅ TeaAttendance: Sheet created');
+    }else{log.push('⏭️ TeaAttendance: Already exists');}
+  }catch(e){log.push('❌ TeaAttendance: '+e.toString());}
+
+  Logger.log('\n========= MIGRATION COMPLETE =========\n'+log.join('\n')+'\n======================================');
+  try{SpreadsheetApp.getUi().alert('Migration Complete',log.join('\n'),SpreadsheetApp.getUi().ButtonSet.OK);}catch(e){}
+}
